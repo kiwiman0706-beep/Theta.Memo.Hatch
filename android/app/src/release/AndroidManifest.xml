@@ -1,0 +1,4 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<!-- Release builds are signed with the Theta Hatch series key, like Theta Meishi Hatch, so both may declare it. -->
+<permission android:name="jp.yaegaki.theta.permission.SHARE" android:protectionLevel="signature" android:label="Theta Hatchの設定の受け渡し"/>
+</manifest>

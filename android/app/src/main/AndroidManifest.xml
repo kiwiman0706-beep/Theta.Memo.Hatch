@@ -1,6 +1,7 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
-<!-- Theta Hatch series: apps signed with the same key may lend each other the Gemini key and read the note list. -->
-<permission android:name="jp.yaegaki.theta.permission.SHARE" android:protectionLevel="signature" android:label="Theta Hatchの設定の受け渡し"/>
+<!-- Theta Hatch series: apps signed with the same key may lend each other the Gemini key and read the note list.
+     The permission itself is declared in src/release only: Android refuses to install an app that
+     declares a permission another app (Meishi) already declares with a different signing key. -->
 <uses-permission android:name="jp.yaegaki.theta.permission.SHARE"/>
 <queries>
   <intent><action android:name="jp.yaegaki.theta.HATCH"/></intent>
