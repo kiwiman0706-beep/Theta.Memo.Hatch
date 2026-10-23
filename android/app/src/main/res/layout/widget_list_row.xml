@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android" android:id="@+id/r_root" android:layout_width="match_parent" android:layout_height="wrap_content" android:paddingTop="3dp" android:paddingBottom="3dp">
+<ImageView android:id="@+id/r_bg" android:layout_width="match_parent" android:layout_height="match_parent" android:src="@drawable/card_bg" android:scaleType="fitXY" android:contentDescription="@null"/>
+<ImageView android:layout_width="match_parent" android:layout_height="match_parent" android:src="@drawable/card_line" android:scaleType="fitXY" android:contentDescription="@null"/>
+<LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:padding="10dp">
+<ImageView android:id="@+id/r_thumb" android:layout_width="match_parent" android:layout_height="96dp" android:layout_marginBottom="6dp" android:scaleType="centerCrop" android:visibility="gone" android:contentDescription="@null"/>
+<TextView android:id="@+id/r_name" android:layout_width="match_parent" android:layout_height="wrap_content" android:ellipsize="end" android:maxLines="1" android:textColor="#202124" android:textSize="14sp" android:textStyle="bold"/>
+<TextView android:id="@+id/r_body" android:layout_width="match_parent" android:layout_height="wrap_content" android:ellipsize="end" android:maxLines="4" android:textColor="#3C4043" android:textSize="12sp"/>
+</LinearLayout>
+</FrameLayout>

@@ -1,0 +1,7 @@
+*.apk
+*.jks
+*.keystore
+local.properties
+.DS_Store
+node_modules/
+private-signing/

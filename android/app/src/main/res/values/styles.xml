@@ -1,0 +1,5 @@
+<resources>
+<style name="AppTheme" parent="android:style/Theme.Material.Light.NoActionBar"><item name="android:colorAccent">#145E58</item><item name="android:windowLightStatusBar">true</item><item name="android:statusBarColor">#F8F9FA</item><item name="android:navigationBarColor">#F8F9FA</item><item name="android:windowBackground">#F8F9FA</item></style>
+<style name="PickTheme" parent="android:style/Theme.Material.Light.Dialog"><item name="android:colorAccent">#145E58</item></style>
+<style name="Invisible" parent="android:style/Theme.Translucent.NoTitleBar"><item name="android:windowNoTitle">true</item><item name="android:windowAnimationStyle">@null</item></style>
+</resources>

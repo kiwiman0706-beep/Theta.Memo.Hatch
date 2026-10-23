@@ -1,0 +1,9 @@
+<resources>
+    <string name="app_name">Theta Memo Hatch</string>
+    <string name="app_short">Theta Memo</string>
+    <string name="widget_empty">メモを作ると、ここに表示されます</string>
+    <string name="widget_note_empty">メモを選んでください（長押し → 設定）</string>
+    <string name="widget_list_description">メモの一覧と、テキスト・リスト・手書き・音声・写真のすばやい作成</string>
+    <string name="widget_note_description">1つのメモを表示。リストはウィジェットからチェックできます</string>
+    <string name="share_label">Theta Memoに保存</string>
+</resources>

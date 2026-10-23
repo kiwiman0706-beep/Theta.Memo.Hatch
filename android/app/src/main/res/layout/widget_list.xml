@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android" android:layout_width="match_parent" android:layout_height="match_parent" android:orientation="vertical" android:background="@drawable/widget_bg" android:padding="8dp">
+<LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:gravity="center_vertical" android:orientation="horizontal">
+<TextView android:id="@+id/w_title" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:paddingStart="6dp" android:text="@string/app_short" android:textColor="#145E58" android:textSize="14sp" android:textStyle="bold" android:maxLines="1"/>
+<ImageView android:id="@+id/w_new_text" android:layout_width="36dp" android:layout_height="36dp" android:layout_marginStart="2dp" android:background="@drawable/round_button" android:padding="8dp" android:src="@drawable/ic_w_text" android:contentDescription="テキスト"/>
+<ImageView android:id="@+id/w_new_list" android:layout_width="36dp" android:layout_height="36dp" android:layout_marginStart="2dp" android:background="@drawable/round_button" android:padding="8dp" android:src="@drawable/ic_w_list" android:contentDescription="リスト"/>
+<ImageView android:id="@+id/w_new_ink" android:layout_width="36dp" android:layout_height="36dp" android:layout_marginStart="2dp" android:background="@drawable/round_button" android:padding="8dp" android:src="@drawable/ic_w_ink" android:contentDescription="手書き"/>
+<ImageView android:id="@+id/w_new_audio" android:layout_width="36dp" android:layout_height="36dp" android:layout_marginStart="2dp" android:background="@drawable/round_button" android:padding="8dp" android:src="@drawable/ic_w_mic" android:contentDescription="音声"/>
+<ImageView android:id="@+id/w_new_photo" android:layout_width="36dp" android:layout_height="36dp" android:layout_marginStart="2dp" android:background="@drawable/round_button" android:padding="8dp" android:src="@drawable/ic_w_camera" android:contentDescription="写真"/>
+</LinearLayout>
+<ListView android:id="@+id/w_list" android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1" android:layout_marginTop="6dp" android:divider="@null" android:dividerHeight="0dp"/>
+<TextView android:id="@+id/w_empty" android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1" android:gravity="center" android:text="@string/widget_empty" android:textColor="#70757A" android:textSize="12sp"/>
+</LinearLayout>

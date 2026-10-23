@@ -1,0 +1,71 @@
+# Run by hand (Actions → Release → Run workflow) or push a tag v0.1.0 → tests, then the APK signed
+# with the Theta Hatch series key, published as a GitHub Release (the app checks it for updates).
+# Needs the repository secrets ANDROID_KEYSTORE_B64 and ANDROID_KEYSTORE_PASSWORD (the same key
+# as Theta Meishi Hatch; ANDROID_KEY_ALIAS if the alias is not "meishiclaude"). See docs/RELEASING.md.
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: "17" }
+      - uses: actions/setup-node@v4
+        with: { node-version: "20" }
+      - id: v
+        name: Version and release notes
+        run: |
+          version="$(sed -n "s/.*versionName '\(.*\)'.*/\1/p" android/app/build.gradle)"
+          if [ "$GITHUB_REF_TYPE" = tag ]; then test "${GITHUB_REF_NAME#v}" = "$version"; fi
+          test -f "docs/releases/v$version.md"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+      - name: Tests
+        run: |
+          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-35" "build-tools;35.0.0" > /dev/null
+          (cd android && ./gradlew testDebugUnitTest --no-daemon)
+          npm install -g playwright@1.56.1
+          npx playwright install --with-deps chromium
+          node android/tests/md.test.cjs
+          NODE_PATH="$(npm root -g)" node android/tests/ui.test.cjs
+      - name: Signed APK
+        env:
+          KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_B64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          SIGNING_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+        run: |
+          if [ -z "$KEYSTORE_B64" ] || [ -z "$KEYSTORE_PASSWORD" ]; then
+            echo "::error::ANDROID_KEYSTORE_B64 / ANDROID_KEYSTORE_PASSWORD are not set"
+            exit 1
+          fi
+          [ -n "$SIGNING_ALIAS" ] || export SIGNING_ALIAS=meishiclaude
+          mkdir -p "$RUNNER_TEMP/signing"
+          echo "$KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/signing/release.jks"
+          printf '%s' "$KEYSTORE_PASSWORD" > "$RUNNER_TEMP/signing/password.txt"
+          SIGNING_FILE="$RUNNER_TEMP/signing/release.jks" SIGNING_PASS_FILE="$RUNNER_TEMP/signing/password.txt" android/build.sh
+          rm -rf "$RUNNER_TEMP/signing"
+      - name: Publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: v${{ steps.v.outputs.version }}
+        run: |
+          if gh release view "$TAG" > /dev/null 2>&1; then
+            gh release upload "$TAG" android/build/theta-memo-hatch-*.apk --clobber
+          else
+            gh release create "$TAG" android/build/theta-memo-hatch-*.apk \
+              --target "$GITHUB_SHA" \
+              --title "Theta Memo Hatch ${{ steps.v.outputs.version }}" \
+              --notes-file "docs/releases/$TAG.md"
+          fi

@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android" android:layout_width="match_parent" android:layout_height="match_parent" android:orientation="vertical" android:background="@drawable/widget_bg" android:padding="10dp">
+<TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:text="@string/app_short" android:textColor="#145E58" android:textSize="14sp" android:textStyle="bold"/>
+<TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="6dp" android:background="#FFF8B8" android:padding="8dp" android:text="買い物\n☐ 牛乳  ☐ パン" android:textColor="#202124" android:textSize="12sp"/>
+<TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="4dp" android:background="#E2F6D3" android:padding="8dp" android:text="週末の予定" android:textColor="#202124" android:textSize="12sp"/>
+</LinearLayout>

@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data: blob:; media-src 'self' blob:; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
+<title>Theta Memo</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header id="top">
+  <div class="bar">
+    <button id="menu" class="icon" title="メニュー" aria-label="メニュー">☰</button>
+    <div id="section-title"></div>
+    <div class="search-box">
+      <span class="search-ic">🔍</span>
+      <input id="search" type="search" placeholder="メモを検索" autocomplete="off" enterkeyhint="search">
+      <button id="search-close" class="icon" title="検索を閉じる" aria-label="検索を閉じる">✕</button>
+    </div>
+    <button id="layout" class="icon" title="表示の切り替え" aria-label="表示の切り替え">▤</button>
+    <button id="sync" class="icon" title="同期" aria-label="同期">⟳</button>
+  </div>
+  <div id="types"></div>
+  <div class="sel-bar">
+    <button id="sel-cancel" class="icon" title="選択をやめる" aria-label="選択をやめる">✕</button>
+    <span id="sel-count"></span>
+    <span class="grow"></span>
+    <button id="sel-pin" class="icon" title="固定" aria-label="固定">📌</button>
+    <button id="sel-color" class="icon" title="色" aria-label="色">🎨</button>
+    <button id="sel-label" class="icon" title="ラベル" aria-label="ラベル">🏷</button>
+    <button id="sel-archive" class="icon" title="アーカイブ" aria-label="アーカイブ">📦</button>
+    <button id="sel-more" class="icon" title="その他" aria-label="その他">⋮</button>
+  </div>
+</header>
+<div id="banner"></div>
+<main id="wall"></main>
+<nav id="newbar">
+  <button id="new-text" class="new-text">メモを入力…</button>
+  <button id="new-list" class="icon" title="リスト" aria-label="新しいリスト">☑</button>
+  <button id="new-ink" class="icon" title="手書き" aria-label="新しい手書きメモ">✎</button>
+  <button id="new-audio" class="icon" title="音声メモ" aria-label="新しい音声メモ">🎤</button>
+  <button id="new-image" class="icon" title="画像・ファイル" aria-label="画像・ファイルのメモ">🖼</button>
+</nav>
+<div id="drawer-back"></div>
+<aside id="drawer"></aside>
+<div id="busy"></div>
+<div id="toast" role="status"></div>
+<script src="lib/marked.js"></script>
+<script src="lib/turndown.js"></script>
+<script src="lib/turndown-gfm.js"></script>
+<script src="md.js"></script>
+<script src="ink.js"></script>
+<script src="app.js"></script>
+<script src="editor.js"></script>
+</body>
+</html>

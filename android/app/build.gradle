@@ -1,0 +1,27 @@
+plugins { id 'com.android.application' }
+android {
+    namespace 'jp.yaegaki.theta.memo'
+    compileSdk 35
+    buildToolsVersion "35.0.0"
+    defaultConfig {
+        applicationId 'jp.yaegaki.theta.memo'
+        minSdk 26
+        targetSdk 35
+        versionCode 1
+        versionName '0.1.0'
+    }
+    testOptions {
+        unitTests.all {
+            systemProperty 'robolectric.dependency.repo.url', System.getenv('ROBOLECTRIC_REPO') ?: 'https://repo1.maven.org/maven2'
+        }
+        unitTests.returnDefaultValues = true
+    }
+    compileOptions { sourceCompatibility JavaVersion.VERSION_1_8; targetCompatibility JavaVersion.VERSION_1_8 }
+}
+
+dependencies {
+    implementation 'com.google.android.gms:play-services-auth:21.2.0'
+    implementation 'org.snakeyaml:snakeyaml-engine:2.7'
+    testImplementation 'junit:junit:4.13.2'
+    testImplementation 'org.json:json:20240303'
+}
