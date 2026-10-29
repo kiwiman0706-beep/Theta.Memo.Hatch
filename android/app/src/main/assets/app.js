@@ -274,7 +274,9 @@
       else if (n.trashed) return false;
       else if (v.section === 'archive') { if (!n.archived) return false; }
       else if (v.section === 'label') { if ((n.labels || []).indexOf(v.label) < 0) return false; }
-      else if (!q && !v.types.length && n.archived) return false;
+      else if (v.section === 'gtd') { if (n.archived || (n.gtd || '') !== v.gtd) return false; }
+      // The wall shows top-level notes; child notes live inside their parent (search finds all).
+      else if (!q && !v.types.length && (n.archived || App.isChild(n) || n.gtd === 'done')) return false;
       if (v.types.length) {
         var s = summaryOf(n);
         for (var i = 0; i < v.types.length; i++) {
@@ -296,9 +298,26 @@
       return true;
     }).sort(function (a, b) {
       if (v.section === 'trash') return b.trashed - a.trashed;
+      if (v.section === 'gtd' && v.gtd === 'done') return (b.done || b.updated) - (a.done || a.updated);
+      if (v.section === 'gtd' && (a.due || b.due) && a.due !== b.due) return (a.due || '9999') < (b.due || '9999') ? -1 : 1;
       return b.updated - a.updated;
     });
   }
+
+  // A note inside another one (its parent exists and is not in the trash).
+  App.isChild = function (n) {
+    var p = n.parent && n.parent !== n.id ? App.byId[n.parent] : null;
+    return !!p && !p.trashed;
+  };
+  App.children = function (id) {
+    return App.notes.filter(function (c) { return c.parent === id && !c.trashed; }).sort(function (a, b) { return a.created - b.created; });
+  };
+  // Parents from the top down to n (stops on loops).
+  App.ancestors = function (n) {
+    var out = [], seen = {}, p = n;
+    while (p && p.parent && !seen[p.parent] && App.byId[p.parent]) { seen[p.parent] = 1; p = App.byId[p.parent]; out.unshift(p); }
+    return out;
+  };
 
   var summaries = {};
   function summaryOf(n) {
@@ -361,6 +380,8 @@
           var tx = el('span', 'tx');
           tx.innerHTML = MD.inline(it.text);
           row.appendChild(tx);
+          var marks = (it.imp ? '★' : '') + (it.urg ? '⚡' : '') + (it.due ? ' ' + GTD.shortDate(it.due) : '');
+          if (marks) row.appendChild(el('span', 'it-marks' + (it.due && it.due < GTD.day() ? ' over' : ''), marks));
           ul.appendChild(row);
         });
         if (open.length > 8) ul.appendChild(el('div', 'card-more', '…'));
@@ -390,6 +411,15 @@
       }
     });
     var chips = el('div', 'card-chips');
+    var L = n.gtd ? GTD.label(n.gtd) : null;
+    if (L && !(App.view.section === 'gtd' && App.view.gtd === n.gtd)) chips.appendChild(el('span', 'chip gtd g-' + n.gtd, L[2] + ' ' + L[1]));
+    if (n.important || n.urgent) chips.appendChild(el('span', 'chip mark', (n.important ? '★重要' : '') + (n.important && n.urgent ? ' ' : '') + (n.urgent ? '⚡緊急' : '')));
+    if (n.due && n.gtd !== 'done') chips.appendChild(el('span', 'chip due' + (n.due < GTD.day() ? ' over' : n.due <= GTD.addDays(GTD.soonDays()) ? ' soon' : ''), '📅 ' + GTD.shortDate(n.due)));
+    if (n.waitingFor) chips.appendChild(el('span', 'chip', '⏳ ' + n.waitingFor));
+    (n.contexts || []).forEach(function (x) { chips.appendChild(el('span', 'chip ctx', x)); });
+    var kids = childCount[n.id];
+    if (kids) chips.appendChild(el('span', 'chip kids', '▸ 子メモ ' + kids));
+    if (n.view === 'mindmap') chips.appendChild(el('span', 'chip', '🧠 マインドマップ'));
     if (n.source && domain(n.source)) chips.appendChild(el('span', 'chip link', domain(n.source)));
     (n.labels || []).slice(0, 4).forEach(function (l) { chips.appendChild(el('span', 'chip', l)); });
     if ((n.labels || []).length > 4) chips.appendChild(el('span', 'chip', '+' + (n.labels.length - 4)));
@@ -397,6 +427,7 @@
     if (inner.childNodes.length) c.appendChild(inner);
     if (!t && !inner.childNodes.length && !pics.length) c.appendChild(el('div', 'card-empty', '空のメモ'));
     if (n.pinned) c.appendChild(el('span', 'pin-mark', '📌'));
+    if (n.gtd === 'done') c.classList.add('done');
     var check = el('span', 'sel-mark', '✓');
     c.appendChild(check);
     // Tap opens; long press starts selecting (as in Keep).
@@ -443,6 +474,7 @@
     return Math.max(2, Math.min(6, Math.floor((w + 8) / 188)));
   }
 
+  var childCount = {};
   function render() {
     clearTimeout(renderTimer);
     if (!App.ready) return;
@@ -451,6 +483,9 @@
     var keepScroll = window.scrollY;
     wall.innerHTML = '';
     wall.classList.toggle('list', columnCount() === 1);
+    childCount = {};
+    App.notes.forEach(function (n) { if (n.parent && !n.trashed) childCount[n.parent] = (childCount[n.parent] || 0) + 1; });
+    if (App.view.section === 'matrix') { GTD.matrix(wall); window.scrollTo(0, keepScroll); return; }
     var list = visible();
     var pinned = App.view.section === 'trash' || App.view.section === 'archive' ? [] : list.filter(function (n) { return n.pinned; });
     var others = list.filter(function (n) { return pinned.indexOf(n) < 0; });
@@ -461,6 +496,7 @@
         : App.view.section === 'trash' ? 'ゴミ箱は空です（30日たったメモは完全に削除されます）'
         : App.view.section === 'archive' ? 'アーカイブしたメモはここに表示されます'
         : App.view.section === 'label' ? 'このラベルのメモはありません'
+        : App.view.section === 'gtd' ? GTD.label(App.view.gtd)[1] + '：' + GTD.label(App.view.gtd)[3]
         : 'メモを追加すると、ここに表示されます';
       empty.appendChild(el('div', 'empty-icon', App.view.section === 'trash' ? '🗑' : '💡'));
       empty.appendChild(el('p', '', msg));
@@ -471,6 +507,14 @@
       }
       wall.appendChild(empty);
       return;
+    }
+    if (App.view.section === 'gtd' && App.view.gtd === 'inbox') {
+      var ib = el('div', 'trash-bar');
+      ib.appendChild(el('span', '', '1件ずつ「整理する」で、次にやる・待ち・予定などに振り分けます'));
+      var go = el('button', 'link', '先頭から整理する');
+      go.onclick = function () { App.clarifyNext(); };
+      ib.appendChild(go);
+      wall.appendChild(ib);
     }
     if (App.view.section === 'trash') {
       var bar = el('div', 'trash-bar');
@@ -532,7 +576,9 @@
     document.body.classList.toggle('selecting', sel.length > 0);
     $('#sel-count').textContent = sel.length + ' 件を選択';
     var v = App.view;
-    var title = v.section === 'archive' ? 'アーカイブ' : v.section === 'trash' ? 'ゴミ箱' : v.section === 'label' ? v.label : '';
+    var title = v.section === 'archive' ? 'アーカイブ' : v.section === 'trash' ? 'ゴミ箱' : v.section === 'label' ? v.label
+      : v.section === 'gtd' ? GTD.label(v.gtd)[2] + ' ' + GTD.label(v.gtd)[1] : v.section === 'matrix' ? 'マトリクス' : '';
+    document.body.classList.toggle('no-new', /^(archive|trash|matrix)$/.test(v.section));
     $('#section-title').textContent = title;
     document.body.classList.toggle('in-section', !!title);
     document.body.classList.toggle('searching', !!(v.query || v.types.length || App.searchOpen));
@@ -566,7 +612,8 @@
 
   function setSection(section, label) {
     App.view.section = section;
-    App.view.label = label || '';
+    App.view.label = section === 'label' ? label : '';
+    App.view.gtd = section === 'gtd' ? label : '';
     App.selected = {};
     closeDrawer();
     window.scrollTo(0, 0);
@@ -596,6 +643,15 @@
       labels.forEach(function (l) { item('🏷', l, function () { setSection('label', l); }, v.section === 'label' && v.label === l); });
     }
     item('✎', 'ラベルの編集', function () { closeDrawer(); editLabels(); });
+    d.appendChild(el('div', 'drawer-sub', 'GTD'));
+    var counts = {};
+    App.notes.forEach(function (n) { if (n.gtd && !n.trashed && !n.archived) counts[n.gtd] = (counts[n.gtd] || 0) + 1; });
+    item('▦', 'マトリクス（重要×緊急）', function () { setSection('matrix'); }, v.section === 'matrix');
+    GTD.LISTS.forEach(function (L) {
+      var b = item(L[2], L[1], function () { setSection('gtd', L[0]); }, v.section === 'gtd' && v.gtd === L[0]);
+      if (counts[L[0]] && L[0] !== 'done') b.appendChild(el('span', 'drawer-count', counts[L[0]] + ''));
+    });
+    item('🔄', '週次レビュー', function () { closeDrawer(); GTD.review(); });
     d.appendChild(el('hr'));
     item('📦', 'アーカイブ', function () { setSection('archive'); }, v.section === 'archive');
     item('🗑', 'ゴミ箱', function () { setSection('trash'); }, v.section === 'trash');
@@ -658,6 +714,8 @@
   App.newNote = function (kind, text) {
     var n = App.blank();
     if (App.view.section === 'label') n.labels = [App.view.label];
+    if (App.view.section === 'gtd') n.gtd = App.view.gtd === 'done' ? 'next' : App.view.gtd;
+    if (App.view.section === 'matrix') n.gtd = 'next';
     if (kind === 'list') n.body = '- [ ] ';
     if (text) n.body = text;
     App.openNote(n, { isNew: true, kind: kind || 'text' });
@@ -865,6 +923,7 @@
     if (window.Ink && Ink.current) { Ink.current.close(); return true; }
     if (sheetStack.length) { sheetStack[sheetStack.length - 1](); return true; }
     if (document.body.classList.contains('drawer-open')) { closeDrawer(); return true; }
+    if (window.Mindmap && Mindmap.current) { Mindmap.current.close(); return true; }
     if (window.Editor && Editor.current) { Editor.current.close(); return true; }
     if (Object.keys(App.selected).length) { App.selected = {}; render(); return true; }
     if (App.view.query || App.view.types.length || App.searchOpen) { closeSearch(); return true; }
@@ -968,6 +1027,12 @@
   }
 
   App.render = render;
+  App.showSection = setSection;
+  App.clarifyNext = function () {
+    var first = visible()[0];
+    if (!first) { App.toast('受信箱は空です'); return; }
+    GTD.clarify(JSON.parse(JSON.stringify(first)), function (n) { App.saveNote(n); render(); setTimeout(App.clarifyNext, 250); });
+  };
   App.setupGuide = setupGuide;
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
   else boot();

@@ -201,4 +201,53 @@ public class VaultTest {
     assertEquals(12, a.size());
     assertFalse(r.errors.isEmpty());
   }
+
+  @Test
+  public void gtdFieldsRoundTrip() throws Exception {
+    JSONObject n = note("請求書を送る", "- [ ] PDFを作る 📅 2026-11-01 #重要");
+    n.put("gtd", "next").put("important", true).put("urgent", true).put("due", "2026-11-01")
+        .put("contexts", new JSONArray().put("@PC")).put("waitingFor", "").put("parent", "p-1").put("view", "mindmap");
+    String md = NoteCodec.render(n);
+    assertTrue(md.contains("gtd: next\nimportant: true\nurgent: true\ndue: 2026-11-01\ncontexts:\n- '@PC'"));
+    assertTrue(md.contains("parent: p-1"));
+    JSONObject back = NoteCodec.parse(md, "x", 0);
+    assertEquals(Sync.hash(n), Sync.hash(back));
+    assertEquals("@PC", back.getJSONArray("contexts").getString(0));
+    assertEquals("mindmap", back.getString("view"));
+    // An ordinary memo has none of the GTD keys.
+    assertFalse(NoteCodec.render(note("ふつう", "x")).contains("gtd:"));
+  }
+
+  @Test
+  public void childNotesCarryAnUpLinkAndObsidianNestingIsUnderstood() throws Exception {
+    FakeRemote drive = new FakeRemote();
+    Store a = Store.openForTest(tmp());
+    JSONObject parent = note("引っ越し", "プロジェクト");
+    parent.put("gtd", "project");
+    a.put(parent);
+    JSONObject child = note("業者に見積もり", "- [ ] 3社に電話");
+    child.put("parent", parent.getString("id")).put("gtd", "next");
+    a.put(child);
+    VaultSync.run(a, drive, QUIET);
+    String md = drive.read(drive.file("Theta Vault/Memo/Notes", "業者に見積もり.md").id);
+    assertTrue(md, md.contains("up: '[[引っ越し]]'"));
+    // Renaming the parent updates the child's link.
+    JSONObject p2 = a.note(parent.getString("id"));
+    p2.put("title", "新居への引っ越し");
+    a.put(p2);
+    VaultSync.run(a, drive, QUIET);
+    md = drive.read(drive.file("Theta Vault/Memo/Notes", "業者に見積もり.md").id);
+    assertTrue(md, md.contains("up: '[[新居への引っ越し]]'"));
+    // A note written in Obsidian under the project, with only "up".
+    drive.write("Theta Vault/Memo/Notes", "鍵の受け取り.md", "---\nup: \"[[新居への引っ越し]]\"\n---\n- [ ] 管理会社へ\n");
+    VaultSync.run(a, drive, QUIET);
+    JSONObject got = null;
+    for (JSONObject x : a.all()) if (x.optString("title").equals("鍵の受け取り")) got = x;
+    assertNotNull(got);
+    assertEquals(parent.getString("id"), got.getString("parent"));
+    assertTrue(drive.read(drive.file("Theta Vault/Memo/Notes", "鍵の受け取り.md").id).contains("parent: " + parent.getString("id")));
+    // And nothing keeps changing afterwards.
+    VaultSync.Result r = VaultSync.run(a, drive, QUIET);
+    assertEquals(0, r.up + r.down);
+  }
 }

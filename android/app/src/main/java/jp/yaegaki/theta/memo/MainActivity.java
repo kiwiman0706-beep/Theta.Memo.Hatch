@@ -86,7 +86,7 @@ public class MainActivity extends Activity {
               if (!HOST.equals(u.getHost()) || !"https".equals(u.getScheme())) return blocked();
               String p = u.getPath();
               if (p.equals("/") || p.equals("/index.html")) return response("text/html", getAssets().open("index.html"));
-              if (p.matches("/(app|ink|editor|md)\\.js")) return response("application/javascript", getAssets().open(p.substring(1)));
+              if (p.matches("/(app|ink|editor|md|gtd|mindmap)\\.js")) return response("application/javascript", getAssets().open(p.substring(1)));
               if (p.equals("/style.css")) return response("text/css", getAssets().open("style.css"));
               if (p.matches("/lib/[A-Za-z0-9.-]+\\.js")) return response("application/javascript", getAssets().open(p.substring(1)));
               if (p.startsWith("/media/")) return media(p.substring(7), r.getRequestHeaders());

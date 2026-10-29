@@ -38,6 +38,15 @@ const NOTES = [
   { id: 'n6', title: '昔のメモ', body: 'アーカイブ済み', color: '', pinned: false, archived: true, trashed: 0, labels: [], created: now - 9e6, updated: now - 9e6 },
   { id: 'n7', title: '消したメモ', body: 'ゴミ箱', color: '', pinned: false, archived: false, trashed: now - 1e5, labels: [], created: now - 9e6, updated: now - 9e6 }
 ];
+const ymd = d => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+const TOMORROW = ymd(new Date(now + 864e5)), PAST = ymd(new Date(now - 3 * 864e5)), TODAY = ymd(new Date(now));
+NOTES.push(
+  { id: 'g1', title: '請求書の件', body: '経理から連絡あり', color: '', pinned: false, archived: false, trashed: 0, labels: [], created: now - 100, updated: now - 100, gtd: 'inbox' },
+  { id: 'g2', title: '引っ越し', body: '新居へ', color: 'teal', pinned: false, archived: false, trashed: 0, labels: [], created: now - 200, updated: now - 200, gtd: 'project', important: true },
+  { id: 'g3', title: '見積もり依頼', body: '', color: '', pinned: false, archived: false, trashed: 0, labels: [], created: now - 300, updated: now - 300, gtd: 'next', important: true, due: TOMORROW, parent: 'g2' },
+  { id: 'g4', title: '家事', body: '- [ ] 洗濯 #重要\n- [ ] 掃除 📅 ' + PAST + '\n- [ ] 買い物', color: '', pinned: false, archived: false, trashed: 0, labels: [], created: now - 400, updated: now - 400 },
+  { id: 'g5', title: '企画', body: '## 目的\n\n- 売上\n- 認知\n\n## 手段\n\n- SNS', color: '', pinned: false, archived: false, trashed: 0, labels: [], created: now - 500, updated: now - 500, view: 'mindmap' }
+);
 for (let i = 0; i < 30; i++) NOTES.push({ id: 'm' + i, title: i % 3 ? '' : 'メモ ' + i, body: 'テキスト ' + i + '\n'.repeat(i % 4) + '続き', color: ['', 'red', 'teal', 'purple'][i % 4], pinned: false, archived: false, trashed: 0, labels: [], created: now - 1e7 - i, updated: now - 1e7 - i });
 
 const MOCK = `
@@ -202,6 +211,80 @@ const MOCK = `
   await p.waitForSelector('.sheet .steps');
   await p.click('.sheet-buttons button:has-text("閉じる")');
   passed++;
+
+  // GTD: child notes stay inside their parent; the matrix sorts actions into four quadrants
+  {
+    const g = await page(390, 844);
+    assert.ok(!(await g.locator('.card[data-id="g3"]').count()), 'child note hidden on the wall');
+    assert.ok(await g.locator('.card[data-id="g2"] .chip.kids', { hasText: '子メモ 1' }).count());
+    assert.ok(await g.locator('.card[data-id="g4"] .it-marks', { hasText: '★' }).count());
+    await g.click('#menu');
+    await g.click('.drawer-item:has-text("マトリクス")');
+    await g.waitForSelector('.matrix');
+    const quad = q => g.locator('.quad.q' + q + ' .act-text');
+    assert.deepStrictEqual(await quad(1).allTextContents(), ['見積もり依頼'], 'due tomorrow makes it urgent');
+    assert.deepStrictEqual((await quad(2).allTextContents()).sort(), ['引っ越し', '洗濯'].sort());
+    assert.deepStrictEqual(await quad(3).allTextContents(), ['掃除'], 'overdue counts as urgent');
+    assert.ok(!(await g.locator('.act-text', { hasText: '買い物' }).count()), 'unmarked items of ordinary notes stay out');
+    await g.waitForTimeout(350);
+    await g.screenshot({ path: path.join(SHOTS, 'matrix.png') });
+    await g.locator('.act', { hasText: '洗濯' }).locator('.act-move').click();
+    await g.click('.menu button:has-text("今すぐやる")');
+    let sv = (await saves(g)).pop();
+    assert.ok(sv.body.includes('- [ ] 洗濯 #重要 #緊急'), sv.body);
+    await g.waitForTimeout(400);
+    await g.locator('.act', { hasText: '掃除' }).locator('input').check();
+    await g.waitForTimeout(500);
+    sv = (await saves(g)).pop();
+    assert.ok(sv.body.includes('- [x] 掃除 📅 ' + PAST + ' ✅ ' + TODAY), sv.body);
+
+    // Inbox: clarify asks the GTD questions
+    await g.click('#menu');
+    await g.click('.drawer-item:has-text("受信箱")');
+    await g.click('.card[data-id="g1"]');
+    await g.click('.ed-gtd .primary-chip:has-text("整理する")');
+    for (const answer of ['はい', 'いいえ', 'はい', '自分', '決まっていない']) await g.click('.clarify .choice:has-text("' + answer + '")');
+    await g.waitForTimeout(300);
+    sv = (await saves(g)).filter(n => n.id === 'g1').pop();
+    assert.strictEqual(sv.gtd, 'next');
+    await g.click('.ed-head .icon >> nth=0');
+    passed++;
+
+    // Nesting: a project's child notes, the breadcrumb, and back to the parent
+    await g.click('#menu');
+    await g.click('.drawer-item:has-text("プロジェクト")');
+    await g.click('.card[data-id="g2"]');
+    await g.waitForSelector('.ed-kids .kid');
+    assert.ok(await g.locator('.kids-head', { hasText: '0 / 1 完了' }).count());
+    await g.click('.kid:has-text("見積もり依頼")');
+    await g.waitForSelector('.ed-crumbs .crumb:has-text("引っ越し")');
+    await g.screenshot({ path: path.join(SHOTS, 'child-note.png') });
+    await g.click('.ed-head .icon >> nth=0');
+    await g.waitForSelector('.ed-kids .kid');
+    assert.strictEqual(await g.locator('.ed-title').textContent(), '引っ越し', 'closing a child returns to its parent');
+    await g.click('.ed-head .icon >> nth=0');
+    passed++;
+
+    // Mind map: opens by itself for this note; adding a branch rewrites the Markdown
+    await g.click('#menu');
+    await g.click('.drawer-item:has-text("メモ")');
+    await g.click('.card[data-id="g5"]');
+    await g.waitForSelector('.mindmap .mm-node');
+    assert.strictEqual(await g.locator('.mm-node').count(), 6);
+    await g.screenshot({ path: path.join(SHOTS, 'mindmap.png') });
+    await g.locator('.mm-node text', { hasText: '売上' }).click();
+    await g.click('.mm-tool[title="子を追加"]');
+    await g.fill('.sheet input', '数値目標');
+    await g.click('.sheet-buttons button:has-text("決定")');
+    await g.waitForTimeout(900);
+    sv = (await saves(g)).filter(n => n.id === 'g5').pop();
+    assert.ok(sv && sv.body.includes('- 売上\n  - 数値目標\n- 認知'), sv && sv.body);
+    assert.strictEqual(await g.locator('.mm-node').count(), 7);
+    await g.click('.mm-bar .icon >> nth=0');
+    assert.ok(await g.locator('.editor .rt', { hasText: '数値目標' }).count(), 'editor shows the new branch');
+    await g.context().close();
+    passed++;
+  }
 
   // Narrow phone, tablet and dark theme
   for (const [w, h, theme, name] of [[320, 640, 'light', 'narrow'], [1024, 768, 'dark', 'tablet-dark']]) {

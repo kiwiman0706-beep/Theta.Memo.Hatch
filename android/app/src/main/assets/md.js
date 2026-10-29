@@ -93,7 +93,10 @@
         var items = [];
         while (i < lines.length && TASK.test(lines[i])) {
           var m = TASK.exec(lines[i]);
-          items.push({ text: m[3], checked: m[2] !== ' ', indent: Math.min(3, Math.floor(m[1].replace(/\t/g, '    ').length / 2)) });
+          var it = task(m[3]);
+          it.checked = m[2] !== ' ';
+          it.indent = Math.min(6, Math.floor(m[1].replace(/\t/g, '    ').length / 2));
+          items.push(it);
           i++;
         }
         i--;
@@ -121,13 +124,116 @@
     return blocks;
   }
 
+  // Task details on a check list item, as the Obsidian Tasks plugin writes them:
+  // "電話する #重要 #緊急 📅 2026-11-01 ✅ 2026-10-30". Other text and tags are left alone.
+  var DUE = /\s*📅\s*(\d{4}-\d{2}-\d{2})/, DONE = /\s*✅\s*(\d{4}-\d{2}-\d{2})/, IMP = /\s*#重要(?=\s|$)/, URG = /\s*#緊急(?=\s|$)/;
+  function task(raw) {
+    var t = String(raw || ''), it = { text: '', due: '', doneDate: '', imp: false, urg: false };
+    var m = DUE.exec(t); if (m) { it.due = m[1]; t = t.replace(DUE, ''); }
+    m = DONE.exec(t); if (m) { it.doneDate = m[1]; t = t.replace(DONE, ''); }
+    if (IMP.test(t)) { it.imp = true; t = t.replace(IMP, ''); }
+    if (URG.test(t)) { it.urg = true; t = t.replace(URG, ''); }
+    it.text = t.replace(/\s+$/, '');
+    return it;
+  }
+  function taskText(it) {
+    var t = String(it.text || '').replace(/\n/g, ' ').replace(/\s+$/, '');
+    if (it.imp) t += ' #重要';
+    if (it.urg) t += ' #緊急';
+    if (it.due) t += ' 📅 ' + it.due;
+    if (it.doneDate) t += ' ✅ ' + it.doneDate;
+    return t;
+  }
+
+  // ---- outline tree (mind map) --------------------------------------------------------
+  // Headings, list items (nested by indent), paragraphs and other blocks as one tree, and back.
+  // A body written as headings and lists comes back unchanged; everything else is kept verbatim.
+  var LI = /^(\s*)([-*+]|\d+[.)])\s+(\[([ xX])\]\s+)?(.*)$/, H = /^(#{1,6})\s+(.*?)\s*#*\s*$/;
+  function outline(body, title) {
+    var root = { kind: 'root', text: title || '', children: [] };
+    var lines = String(body || '').replace(/\r\n/g, '\n').split('\n');
+    var hs = [{ node: root, level: 0 }], ls = [], para = null, raw = null, fence = null;
+    function top() { return hs[hs.length - 1].node; }
+    function end() { para = null; raw = null; }
+    for (var i = 0; i < lines.length; i++) {
+      var l = lines[i];
+      if (fence) { raw.lines.push(l); if (l.trim().indexOf(fence) === 0) { fence = null; end(); } continue; }
+      var f = /^\s*(```|~~~)/.exec(l);
+      if (f) { fence = f[1]; raw = { kind: 'raw', lines: [l], children: [] }; top().children.push(raw); ls = []; para = null; continue; }
+      if (!l.trim()) { end(); continue; }
+      var m = H.exec(l);
+      if (m) {
+        end(); ls = [];
+        var level = m[1].length;
+        while (hs.length > 1 && hs[hs.length - 1].level >= level) hs.pop();
+        var h = { kind: 'h', level: level, text: m[2], children: [] };
+        top().children.push(h);
+        hs.push({ node: h, level: level });
+        continue;
+      }
+      m = LI.exec(l);
+      if (m) {
+        end();
+        var ind = m[1].replace(/\t/g, '    ').length;
+        while (ls.length && ls[ls.length - 1].indent >= ind) ls.pop();
+        var li = { kind: 'li', marker: /^\d/.test(m[2]) ? m[2] : '-', task: !!m[3], checked: !!m[4] && m[4] !== ' ', text: m[5], children: [] };
+        (ls.length ? ls[ls.length - 1].node : top()).children.push(li);
+        ls.push({ node: li, indent: ind });
+        continue;
+      }
+      if (fileLine(l) || TABLE_ROW.test(l)) {
+        para = null;
+        if (!raw || fileLine(l)) { raw = { kind: 'raw', lines: [], children: [] }; top().children.push(raw); }
+        raw.lines.push(l);
+        ls = [];
+        if (fileLine(l)) raw = null;
+        continue;
+      }
+      if (/^\s*>/.test(l) && raw && raw.lines.length && fileLine(raw.lines[0])) { raw.lines.push(l); continue; }
+      raw = null;
+      if (para) { para.lines.push(l); continue; }
+      ls = [];
+      para = { kind: 'p', lines: [l], children: [] };
+      top().children.push(para);
+    }
+    return root;
+  }
+
+  function outlineBody(root) {
+    var out = [];
+    function blank() { if (out.length && out[out.length - 1] !== '') out.push(''); }
+    function emit(node, depth) {
+      node.children.forEach(function (c) {
+        if (c.kind === 'h') {
+          blank();
+          out.push(new Array(Math.min(6, c.level || 2) + 1).join('#') + ' ' + String(c.text || '').replace(/\n/g, ' '));
+          blank();
+          emit(c, 0);
+        } else if (c.kind === 'li') {
+          if (depth === 0 && out.length && out[out.length - 1] !== '' && !/^\s*([-*+]|\d+[.)])\s/.test(out[out.length - 1])) blank();
+          out.push(new Array(depth + 1).join('  ') + (c.marker || '-') + ' ' + (c.task ? '[' + (c.checked ? 'x' : ' ') + '] ' : '') + String(c.text || '').replace(/\n/g, ' '));
+          emit(c, depth + 1);
+        } else {
+          blank();
+          (c.lines || []).forEach(function (x) { out.push(x); });
+          blank();
+          emit(c, 0);
+        }
+      });
+    }
+    emit(root, 0);
+    while (out.length && out[out.length - 1] === '') out.pop();
+    while (out.length && out[0] === '') out.shift();
+    return out.join('\n');
+  }
+
   function cell(s) { return String(s == null ? '' : s).replace(/\n/g, ' ').replace(/(^|[^\\])\|/g, '$1\\|').trim(); }
 
   function serializeBlock(b) {
     if (b.t === 'text') return String(b.md || '').replace(/\s+$/, '');
     if (b.t === 'list') {
       return b.items.map(function (it) {
-        return new Array((it.indent || 0) + 1).join('  ') + '- [' + (it.checked ? 'x' : ' ') + '] ' + String(it.text || '').replace(/\n/g, ' ');
+        return new Array((it.indent || 0) + 1).join('  ') + '- [' + (it.checked ? 'x' : ' ') + '] ' + taskText(it);
       }).join('\n');
     }
     if (b.t === 'table') {
@@ -276,7 +382,7 @@
     return sanitize(root.marked.parseInline(String(md || '')));
   }
 
-  var api = { parse: parse, serialize: serialize, serializeBlock: serializeBlock, fileLine: fileLine, kindOf: kindOf, plain: plain,
+  var api = { task: task, taskText: taskText, outline: outline, outlineBody: outlineBody, parse: parse, serialize: serialize, serializeBlock: serializeBlock, fileLine: fileLine, kindOf: kindOf, plain: plain,
     title: title, summary: summary, html: html, inline: inline, esc: esc, sanitize: sanitize, FILES: FILES, baseName: baseName };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.MD = api;

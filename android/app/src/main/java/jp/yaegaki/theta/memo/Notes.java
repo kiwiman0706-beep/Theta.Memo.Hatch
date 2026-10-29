@@ -59,6 +59,10 @@ public final class Notes {
   }
 
   static String inline(String s) {
+    // Task details (Obsidian Tasks style) become a short date; the matrix tags are dropped.
+    s = s.replaceAll("\\s*✅\\s*\\d{4}-\\d{2}-\\d{2}", "")
+        .replaceAll("\\s*#(重要|緊急)(?=\\s|$)", "")
+        .replaceAll("\\s*📅\\s*\\d{4}-0?(\\d{1,2})-0?(\\d{1,2})", " ($1/$2)");
     return s.replaceAll("!?\\[\\[[^\\]]*\\]\\]", "")
         .replaceAll("!\\[[^\\]]*\\]\\([^)]*\\)", "")
         .replaceAll("\\[([^\\]]*)\\]\\([^)]*\\)", "$1")

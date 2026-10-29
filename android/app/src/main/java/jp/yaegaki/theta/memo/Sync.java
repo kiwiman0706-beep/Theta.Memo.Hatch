@@ -66,6 +66,17 @@ public final class Sync {
     s.put("source", s.optString("source"));
     s.put("importKey", s.optString("importKey"));
     if (s.optJSONArray("labels") == null) s.put("labels", new JSONArray());
+    // GTD and nesting (docs/GTD.md). The parent's file name is display only.
+    s.remove("upName");
+    s.put("gtd", s.optString("gtd"));
+    s.put("important", s.optBoolean("important"));
+    s.put("urgent", s.optBoolean("urgent"));
+    s.put("due", s.optString("due"));
+    if (s.optJSONArray("contexts") == null) s.put("contexts", new JSONArray());
+    s.put("waitingFor", s.optString("waitingFor"));
+    s.put("done", s.optLong("done") > 0 ? 1 : 0);
+    s.put("parent", s.optString("parent"));
+    s.put("view", s.optString("view"));
     JSONObject extra = s.optJSONObject("extra");
     if (extra != null && extra.length() == 0) s.remove("extra");
     return s;

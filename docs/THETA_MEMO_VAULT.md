@@ -33,6 +33,16 @@ color: yellow              ← Keepの色（red orange yellow green teal blue da
 pinned: true               ← 固定（省略時 false）
 archived: true             ← アーカイブ（省略時 false）
 trashed: 2026-10-23T…      ← ゴミ箱に入れた日時（ゴミ箱のときだけ）
+gtd: next                  ← GTDのリスト（inbox next waiting scheduled project someday reference done。ふつうのメモは省略）
+important: true            ← 重要（アイゼンハワーマトリクス）
+urgent: true               ← 緊急
+due: 2026-11-01            ← 期限
+contexts: ['@PC']          ← 状況
+waiting_for: 山田さん       ← 待ちの相手
+done: 2026-10-30T…         ← 完了した日時
+parent: 5a1c…              ← 親メモのid（入れ子）
+up: "[[親のファイル名]]"     ← Obsidian用の親へのリンク（同期が書く。Obsidianでこれだけ書いても親子になる）
+view: mindmap              ← いつもマインドマップで開く
 tags:                      ← Keepのラベル（Obsidianのタグとしても使える。空白は _ に）
 - 家
 source: https://…          ← 切り抜いたページ（Obsidian Web Clipper と同じ項目名）
@@ -44,6 +54,7 @@ updated: 2026-10-23T10:05:00.000+09:00
 
 - [ ] 牛乳                 ← チェックリスト（Keepのリスト）
 - [x] パン
+- [ ] 見積書 #重要 #緊急 📅 2026-11-01   ← 行ごとの重要・緊急・期限（Obsidian Tasks と同じ書き方。docs/GTD.md）
 
 | 品 | 数 |
 | --- | ---: |

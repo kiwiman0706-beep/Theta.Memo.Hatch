@@ -26,4 +26,22 @@ t('summary and titles', () => {
   assert.strictEqual(s.unchecked, 1); assert.strictEqual(s.checked, 1); assert.strictEqual(s.ink.length, 1);
   assert.strictEqual(MD.title({ title: '', body: '\n## 予定 **明日**\n本文' }), '予定 明日');
 });
+t('task details like Obsidian Tasks', () => {
+  const b = MD.parse('- [ ] 電話する #重要 #緊急 📅 2026-11-01\n- [x] 送った ✅ 2026-10-29 #仕事');
+  assert.deepStrictEqual(b[0].items[0], { text: '電話する', due: '2026-11-01', doneDate: '', imp: true, urg: true, checked: false, indent: 0 });
+  assert.strictEqual(b[0].items[1].text, '送った #仕事');
+  assert.strictEqual(MD.serialize(b), '- [ ] 電話する #重要 #緊急 📅 2026-11-01\n- [x] 送った #仕事 ✅ 2026-10-29');
+});
+t('outline tree round trip', () => {
+  const body = '# 旅行\n\n## 準備\n\n- 持ち物\n  - [ ] 充電器\n  - [x] 財布\n- 予約\n\n本文の段落\n2行目\n\n![[Memo/_files/a.jpg]]\n\n## 当日\n\n1. 出発\n2. 到着';
+  const tree = MD.outline(body, 'タイトル');
+  assert.strictEqual(tree.children[0].text, '旅行');
+  const prep = tree.children[0].children[0];
+  assert.strictEqual(prep.text, '準備');
+  assert.strictEqual(prep.children[0].children[0].task, true);
+  assert.strictEqual(prep.children[2].kind, 'p');
+  assert.strictEqual(MD.outlineBody(tree), body);
+  prep.children[1].children.push({ kind: 'li', marker: '-', text: 'ホテル', children: [] });
+  assert.ok(MD.outlineBody(tree).includes('- 予約\n  - ホテル\n\n本文'));
+});
 console.log(n + ' md tests passed');

@@ -81,8 +81,15 @@
     var list = el('div', 'ed-blocks');
     var labels = el('div', 'ed-labels');
     var meta = el('div', 'ed-meta');
+    var crumbs = el('div', 'ed-crumbs');
+    var gtdBox = el('div', 'ed-gtd');
+    var kids = el('div', 'ed-kids');
+    var showGtd = false;
+    scroll.appendChild(crumbs);
     scroll.appendChild(title);
+    scroll.appendChild(gtdBox);
     scroll.appendChild(list);
+    scroll.appendChild(kids);
     scroll.appendChild(labels);
     scroll.appendChild(meta);
     root.appendChild(scroll);
@@ -93,7 +100,7 @@
     // Formatting bar: shown while a rich-text block has the caret.
     var fmt = el('div', 'fmt-bar');
     [['B', 'bold', '太字'], ['I', 'italic', '斜体'], ['U', 'underline', '下線'], ['S', 'strikeThrough', '取り消し線'], ['▮', 'mark', 'ハイライト'],
-     ['H1', 'h1', '大見出し'], ['H2', 'h2', '見出し'], ['本文', 'p', '本文'], ['•', 'insertUnorderedList', '箇条書き'], ['1.', 'insertOrderedList', '番号付き'],
+     ['H1', 'h1', '大見出し'], ['H2', 'h2', '見出し'], ['本文', 'p', '本文'], ['•', 'insertUnorderedList', '箇条書き'], ['1.', 'insertOrderedList', '番号付き'], ['⇥', 'indent', '入れ子にする（字下げ）'], ['⇤', 'outdent', '入れ子を戻す'],
      ['❝', 'blockquote', '引用'], ['</>', 'pre', 'コード'], ['🔗', 'link', 'リンク'], ['✕', 'clear', '書式をクリア']].forEach(function (f) {
       var b = el('button', 'fmt', f[0]);
       b.title = f[2];
@@ -121,6 +128,11 @@
       footBtn('🏷', 'ラベル', function () { App.labelDialog([n], function (l) { n.labels = l; paintLabels(); changed(); }); });
       footBtn('🎤', '録音', function () { startRecording(); });
       footBtn('✎', '手書き', function () { insertInk(); });
+      footBtn('✓', 'タスク（GTD）', function () {
+        showGtd = !showGtd || !n.gtd;
+        if (!n.gtd) { n.gtd = 'inbox'; changed(); }
+        paintGtd();
+      });
     }
     var stamp = el('span', 'ed-stamp');
     foot.appendChild(stamp);
@@ -196,6 +208,9 @@
         rt.dataset.placeholder = i === 0 || blocks.length === 1 ? 'メモを入力…' : '';
         rt.addEventListener('input', function () { b.dirty = true; changed(); });
         rt.addEventListener('focus', function () { focusIndex = i; root.classList.add('fmt-on'); });
+        rt.addEventListener('keydown', function (e) {
+          if (e.key === 'Tab') { e.preventDefault(); document.execCommand(e.shiftKey ? 'outdent' : 'indent'); b.dirty = true; changed(); }
+        });
         rt.addEventListener('blur', function () { setTimeout(function () { if (!root.contains(document.activeElement) || !document.activeElement.closest('.rt')) root.classList.remove('fmt-on'); }, 50); });
         rt.addEventListener('click', function (e) {
           var a = e.target.closest('a');
@@ -247,6 +262,7 @@
         cb.disabled = readOnly;
         cb.onchange = function () {
           it.checked = cb.checked;
+          it.doneDate = it.checked && (it.due || it.imp || it.urg || n.gtd) ? GTD.day() : '';
           b.items.splice(k, 1);
           if (it.checked) b.items.push(it);
           else {
@@ -283,19 +299,23 @@
               else { changed(); draw(); }
             } else if (e.key === 'Tab') {
               e.preventDefault();
-              it.indent = Math.max(0, Math.min(3, (it.indent || 0) + (e.shiftKey ? -1 : 1)));
+              it.indent = Math.max(0, Math.min(6, (it.indent || 0) + (e.shiftKey ? -1 : 1)));
               changed();
               draw();
               focusItem(i, k, caret(tx));
             }
           });
         }
-        var del = el('button', 'it-del', '✕');
-        del.title = '削除';
-        del.onclick = function () { b.items.splice(k, 1); changed(); draw(); };
+        var del = el('button', 'it-del', '⋯');
+        del.title = 'この行の操作';
+        del.addEventListener('pointerdown', function (e) { e.preventDefault(); });
+        del.onclick = function () { itemMenu(del, b, k, i); };
+        var marks = el('span', 'it-marks' + (it.due && it.due < GTD.day() && !it.checked ? ' over' : ''),
+          (it.imp ? '★' : '') + (it.urg ? '⚡' : '') + (it.due ? ' 📅' + GTD.shortDate(it.due) : '') + (it.checked && it.doneDate ? ' ✅' + GTD.shortDate(it.doneDate) : ''));
         if (!readOnly) row.appendChild(handle);
         row.appendChild(cb);
         row.appendChild(tx);
+        if (marks.textContent) row.appendChild(marks);
         if (!readOnly) row.appendChild(del);
         (it.checked ? doneBox : openBox).appendChild(row);
         if (!readOnly && !it.checked) dragSort(handle, row, b, k, openBox);
@@ -331,7 +351,7 @@
         var dx = e.changedTouches[0].clientX - x0, dy = e.changedTouches[0].clientY - y0;
         x0 = null;
         if (Math.abs(dx) > 60 && Math.abs(dy) < 30) {
-          it.indent = Math.max(0, Math.min(3, (it.indent || 0) + (dx > 0 ? 1 : -1)));
+          it.indent = Math.max(0, Math.min(6, (it.indent || 0) + (dx > 0 ? 1 : -1)));
           changed();
           draw();
         }
@@ -641,6 +661,14 @@
         items.push([sourceMode ? '👁 通常の表示に戻す' : '⌨ Markdownで編集', toggleSource]);
       }
       if (n.source) items.push(['🔗 元のページを開く', function () { App.native('openUrl', { url: n.source }); }]);
+      items.push(null);
+      items.push(['🧠 マインドマップで見る', function () { openMap(); }]);
+      if (!readOnly) {
+        items.push([(n.view === 'mindmap' ? '☑' : '☐') + ' いつもマインドマップで開く', function () { n.view = n.view === 'mindmap' ? '' : 'mindmap'; changed(); }]);
+        items.push(['↳ 親メモを選ぶ（入れ子にする）', pickParent]);
+        if (n.parent) items.push(['↰ 最上位に戻す', function () { n.parent = ''; changed(); flush(); paintCrumbs(); }]);
+        items.push(['＋ 子メモを作る', function () { var c = App.blank(); c.parent = n.id; if (n.gtd) c.gtd = 'next'; isNew = false; saved = false; flush(); openOther(c, { isNew: true, kind: 'text' }); }]);
+      }
       App.menu(anchor, items);
     }
 
@@ -697,6 +725,242 @@
       });
     }
 
+    // ---- GTD, parents and children ------------------------------------------------------------
+
+    function itemMenu(anchor, b, k, bi) {
+      var it = b.items[k];
+      App.menu(anchor, [
+        [(it.imp ? '☑' : '☐') + ' ★ 重要', function () { it.imp = !it.imp; changed(); draw(); }],
+        [(it.urg ? '☑' : '☐') + ' ⚡ 緊急', function () { it.urg = !it.urg; changed(); draw(); }],
+        ['📅 期限' + (it.due ? '（' + GTD.shortDate(it.due) + '）' : '') + '…', function () {
+          pickDate(it.due, function (d) { it.due = d; changed(); draw(); });
+        }],
+        ['↳ 子メモにする', function () {
+          b.items.splice(k, 1);
+          var c = App.blank();
+          c.title = MD.plain(it.text).trim();
+          c.parent = n.id;
+          c.gtd = 'next';
+          c.important = !!it.imp;
+          c.urgent = !!it.urg;
+          c.due = it.due || '';
+          changed();
+          flush();
+          App.saveNote(c);
+          draw();
+          paintKids();
+          App.toast('子メモ「' + (c.title || 'メモ') + '」にしました');
+        }],
+        ['⇥ 1段下げる', function () { it.indent = Math.min(6, (it.indent || 0) + 1); changed(); draw(); }],
+        ['⇤ 1段上げる', function () { it.indent = Math.max(0, (it.indent || 0) - 1); changed(); draw(); }],
+        null,
+        ['削除', function () { b.items.splice(k, 1); changed(); draw(); }, true]
+      ]);
+    }
+
+    function pickDate(value, done) {
+      var body = el('div');
+      var input = el('input', 'wide');
+      input.type = 'date';
+      input.value = value || '';
+      body.appendChild(input);
+      var quick = el('div', 'button-row');
+      [['今日', 0], ['明日', 1], ['来週', 7]].forEach(function (q) {
+        var b = el('button', '', q[0]);
+        b.onclick = function () { input.value = GTD.addDays(q[1]); };
+        quick.appendChild(b);
+      });
+      body.appendChild(quick);
+      App.sheet('期限', body, [['期限なし', function () { done(''); }], ['キャンセル'], ['決定', function () { done(input.value || ''); }, 'primary']]);
+    }
+
+    function paintGtd() {
+      gtdBox.innerHTML = '';
+      var on = !!(n.gtd || n.important || n.urgent || n.due || showGtd);
+      gtdBox.style.display = on ? '' : 'none';
+      if (!on) return;
+      var L = GTD.label(n.gtd) || ['', '未分類', '○'];
+      var st = el('button', 'gtd-status g-' + (n.gtd || 'none'), L[2] + ' ' + L[1] + ' ▾');
+      st.disabled = readOnly;
+      st.onclick = function () {
+        App.menu(st, GTD.LISTS.map(function (x) {
+          return [(n.gtd === x[0] ? '● ' : '○ ') + x[2] + ' ' + x[1], function () {
+            n.gtd = x[0];
+            n.done = x[0] === 'done' ? Date.now() : 0;
+            changed();
+            paintGtd();
+          }];
+        }).concat([null, ['タスクにしない（ふつうのメモ）', function () { n.gtd = ''; n.important = n.urgent = false; n.due = ''; showGtd = false; changed(); paintGtd(); }]]));
+      };
+      gtdBox.appendChild(st);
+      function toggle(key, label) {
+        var b = el('button', 'toggle' + (n[key] ? ' on' : ''), label);
+        b.disabled = readOnly;
+        b.onclick = function () { n[key] = !n[key]; changed(); paintGtd(); };
+        gtdBox.appendChild(b);
+      }
+      toggle('important', '★ 重要');
+      toggle('urgent', '⚡ 緊急');
+      var d = el('button', 'toggle' + (n.due ? ' on' : '') + (n.due && n.due < GTD.day() && n.gtd !== 'done' ? ' over' : ''), '📅 ' + (n.due ? GTD.shortDate(n.due) : '期限'));
+      d.disabled = readOnly;
+      d.onclick = function () { pickDate(n.due, function (v) { n.due = v; if (v && n.gtd === 'inbox') n.gtd = 'scheduled'; changed(); paintGtd(); }); };
+      gtdBox.appendChild(d);
+      (n.contexts || []).forEach(function (c, ci) {
+        var b = el('button', 'toggle ctx on', c + ' ✕');
+        b.disabled = readOnly;
+        b.onclick = function () { n.contexts.splice(ci, 1); changed(); paintGtd(); };
+        gtdBox.appendChild(b);
+      });
+      if (!readOnly) {
+        var add = el('button', 'toggle', '＋状況');
+        add.title = 'やる場所・道具（@家、@PC、@電話…）';
+        add.onclick = function () {
+          var used = {};
+          App.notes.forEach(function (x) { (x.contexts || []).forEach(function (c) { used[c] = 1; }); });
+          var options = Object.keys(used).concat(['@家', '@会社', '@PC', '@電話', '@外出先']).filter(function (c, i2, a) { return a.indexOf(c) === i2 && (n.contexts || []).indexOf(c) < 0; });
+          App.menu(add, options.map(function (c) { return [c, function () { n.contexts = (n.contexts || []).concat([c]); changed(); paintGtd(); }]; }).concat([null, ['新しい状況…', function () {
+            var v = prompt('状況（例：@買い物）', '@');
+            v = v && v.trim().replace(/\s+/g, '_');
+            if (v && v !== '@') { if (v[0] !== '@') v = '@' + v; n.contexts = (n.contexts || []).concat([v]); changed(); paintGtd(); }
+          }]]));
+        };
+        gtdBox.appendChild(add);
+      }
+      if (n.gtd === 'waiting') {
+        var w = el('input', 'waiting');
+        w.placeholder = '誰を待っている？';
+        w.value = n.waitingFor || '';
+        w.disabled = readOnly;
+        w.oninput = function () { n.waitingFor = w.value.trim(); changed(); };
+        gtdBox.appendChild(w);
+      }
+      if (!readOnly && n.gtd === 'inbox') {
+        var c = el('button', 'primary-chip', '整理する');
+        c.onclick = function () {
+          flush();
+          GTD.clarify(JSON.parse(JSON.stringify(n)), function (x) {
+            ['gtd', 'important', 'urgent', 'due', 'waitingFor', 'done', 'trashed'].forEach(function (k2) { n[k2] = x[k2]; });
+            saved = false;
+            flush();
+            if (n.trashed) { App.toast('ゴミ箱に移動しました'); destroy(); return; }
+            paintGtd();
+            paintKids();
+          });
+        };
+        gtdBox.appendChild(c);
+      }
+      if (!readOnly && GTD.ACTIVE[n.gtd] && n.gtd !== 'project') {
+        var fin = el('button', 'primary-chip', '✓ 完了');
+        fin.onclick = function () { n.gtd = 'done'; n.done = Date.now(); changed(); flush(); App.toast('完了にしました'); close(); };
+        gtdBox.appendChild(fin);
+      }
+    }
+
+    function paintCrumbs() {
+      crumbs.innerHTML = '';
+      var up = App.ancestors(n);
+      up.forEach(function (p) {
+        var b = el('button', 'crumb', MD.title(p) || 'メモ');
+        b.onclick = function () { openOther(p, {}); };
+        crumbs.appendChild(b);
+        crumbs.appendChild(el('span', 'sep', '›'));
+      });
+    }
+
+    function paintKids() {
+      kids.innerHTML = '';
+      var list2 = App.children(n.id);
+      if (!list2.length && n.gtd !== 'project') return;
+      var head = el('div', 'kids-head');
+      var done = list2.filter(function (c) { return c.gtd === 'done'; }).length;
+      head.appendChild(el('b', '', '子メモ'));
+      if (list2.length) head.appendChild(el('span', 'muted', n.gtd === 'project' ? done + ' / ' + list2.length + ' 完了' : list2.length + ' 件'));
+      if (n.gtd === 'project' && !list2.some(function (c) { return GTD.ACTIVE[c.gtd] && c.gtd !== 'project'; }))
+        head.appendChild(el('span', 'warn', '次の行動がありません'));
+      kids.appendChild(head);
+      list2.forEach(function (c) {
+        var r = el('div', 'kid c-' + (c.color || 'default') + (c.gtd === 'done' ? ' done' : ''));
+        if (c.gtd) {
+          var cb = el('input');
+          cb.type = 'checkbox';
+          cb.checked = c.gtd === 'done';
+          cb.disabled = readOnly;
+          cb.onclick = function (e) { e.stopPropagation(); };
+          cb.onchange = function () {
+            var x = JSON.parse(JSON.stringify(c));
+            x.gtd = cb.checked ? 'done' : 'next';
+            x.done = cb.checked ? Date.now() : 0;
+            App.saveNote(x);
+            setTimeout(paintKids, 0);
+          };
+          r.appendChild(cb);
+        }
+        var t = el('div', 'kid-body');
+        t.appendChild(el('div', 'kid-title', MD.title(c) || '（タイトルなし）'));
+        var sub = [];
+        var L = GTD.label(c.gtd);
+        if (L && c.gtd !== 'done') sub.push(L[2] + ' ' + L[1]);
+        if (c.due) sub.push('📅 ' + GTD.shortDate(c.due));
+        var grand = App.children(c.id).length;
+        if (grand) sub.push('▸ ' + grand);
+        if (sub.length) t.appendChild(el('div', 'kid-sub', sub.join('　')));
+        r.appendChild(t);
+        r.onclick = function () { openOther(c, {}); };
+        kids.appendChild(r);
+      });
+      if (!readOnly) {
+        var add = el('button', 'it-add', '＋ 子メモ');
+        add.onclick = function () {
+          var c = App.blank();
+          c.parent = n.id;
+          if (n.gtd === 'project' || n.gtd) c.gtd = 'next';
+          c.color = n.color;
+          if (isNew && empty()) { n.title = n.title || ''; }
+          isNew = false;
+          saved = false;
+          flush();
+          openOther(c, { isNew: true, kind: 'text' });
+        };
+        kids.appendChild(add);
+      }
+    }
+
+    // Another note in the same tree; closing it comes back here.
+    function openOther(other, o) {
+      flush();
+      var back = n.id;
+      destroy();
+      o.back = o.back || back;
+      App.openNote(App.byId[other.id] || other, o);
+    }
+
+    function pickParent() {
+      var body = el('div', 'labels-edit');
+      var input = el('input');
+      input.placeholder = '親にするメモを検索';
+      body.appendChild(input);
+      var listBox = el('div', 'labels-list');
+      body.appendChild(listBox);
+      // Not itself, and not one of its own descendants (no loops).
+      var banned = {};
+      (function mark(id) { banned[id] = 1; App.children(id).forEach(function (c) { mark(c.id); }); })(n.id);
+      var close2;
+      function draw2() {
+        listBox.innerHTML = '';
+        var q = App.norm(input.value.trim());
+        App.notes.filter(function (x) { return !x.trashed && !banned[x.id] && (!q || App.norm(MD.title(x)).indexOf(q) >= 0); })
+          .sort(function (a, b2) { return (b2.gtd === 'project') - (a.gtd === 'project') || b2.updated - a.updated; })
+          .slice(0, 60).forEach(function (x) {
+            var b2 = el('button', 'pick-row', (x.gtd === 'project' ? '📁 ' : '') + (MD.title(x) || '（タイトルなし）'));
+            b2.onclick = function () { n.parent = x.id; changed(); flush(); paintCrumbs(); close2(); App.toast('「' + (MD.title(x) || 'メモ') + '」の中に入れました'); };
+            listBox.appendChild(b2);
+          });
+      }
+      input.oninput = draw2;
+      draw2();
+      close2 = App.sheet('親メモを選ぶ', body, [['キャンセル']]);
+    }
+
     function paintMeta() {
       stamp.textContent = isNew ? '' : '編集：' + App.when(n.updated || Date.now());
       meta.innerHTML = '';
@@ -724,9 +988,30 @@
 
     function close() {
       if (window.Ink && Ink.current) Ink.current.close();
+      if (window.Mindmap && Mindmap.current) Mindmap.current.close();
       flush();
       if (isNew && empty()) App.toast('空のメモは保存しませんでした');
       destroy();
+      // Back to the parent this note was opened from.
+      if (opts.back && App.byId[opts.back]) App.openNote(App.byId[opts.back], {});
+    }
+
+    function openMap() {
+      flush();
+      Mindmap.open({
+        title: title.textContent || '',
+        body: body(),
+        readOnly: readOnly,
+        children: App.children(n.id),
+        onChange: function (newTitle, newBody) {
+          if (newTitle !== title.textContent) title.textContent = newTitle;
+          blocks = MD.parse(newBody);
+          changed();
+          draw();
+        },
+        openNote: function (c) { Mindmap.current && Mindmap.current.close(); openOther(c, {}); },
+        onClose: function () { flush(); }
+      });
     }
 
     // ---- events from the platform -------------------------------------------------------------
@@ -739,7 +1024,8 @@
       // The stored note changed elsewhere (sync, widget): take it if we have nothing unsaved.
       external: function (fresh) {
         if (!fresh || !saved || sourceMode) return;
-        if (fresh.body === n.body && fresh.title === n.title && fresh.color === n.color) return;
+        var same = ['body', 'title', 'color', 'gtd', 'important', 'urgent', 'due', 'parent', 'pinned', 'waitingFor'].every(function (k) { return JSON.stringify(fresh[k]) === JSON.stringify(n[k]); });
+        if (same) return;
         if (document.activeElement && root.contains(document.activeElement) && document.activeElement !== document.body) return;
         n = JSON.parse(JSON.stringify(fresh));
         api.note = n;
@@ -750,6 +1036,9 @@
         paintHead();
         paintLabels();
         paintMeta();
+        paintGtd();
+        paintCrumbs();
+        paintKids();
       },
       attached: function (d) {
         (d.files || []).forEach(function (f) {
@@ -826,6 +1115,10 @@
     paintHead();
     paintLabels();
     paintMeta();
+    paintGtd();
+    paintCrumbs();
+    paintKids();
+    if (n.view === 'mindmap' && !opts.isNew) setTimeout(openMap, 0);
     if (App.state.recording === n.id) api.recording({ note: n.id, start: App.state.recordingStart });
 
     var kind = opts.kind;

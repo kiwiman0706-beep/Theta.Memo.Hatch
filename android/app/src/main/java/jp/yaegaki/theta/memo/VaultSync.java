@@ -79,6 +79,9 @@ public final class VaultSync {
     String files, trash;
     Map<String, String> media = new HashMap<>(); // local name -> drive id
     Map<String, Set<String>> names = new HashMap<>(); // folder id -> file names in use
+    Map<String, Remote> remote = new HashMap<>(); // id -> where its file is now
+    Map<String, String> byTitle = new HashMap<>(); // file name without .md -> id (for "up: [[…]]")
+    Set<String> renamed = new HashSet<>(); // notes whose file got a new name in this run
     Result res = new Result();
     boolean allowRemoteDeletes = true;
   }
@@ -112,7 +115,7 @@ public final class VaultSync {
       byFile.put(x.known.getJSONObject(id).optString("f"), id);
     }
 
-    Map<String, Remote> remote = new HashMap<>();
+    Map<String, Remote> remote = x.remote;
     for (String folder : scan) {
       Set<String> used = new HashSet<>();
       x.names.put(folder, used);
@@ -180,6 +183,7 @@ public final class VaultSync {
     for (Iterator<String> it = tomb.keys(); it.hasNext(); ) ids.add(it.next());
     for (Iterator<String> it = x.known.keys(); it.hasNext(); ) ids.add(it.next());
 
+    for (Map.Entry<String, Remote> e : remote.entrySet()) x.byTitle.put(title(e.getValue().name), e.getKey());
     int n = 0;
     for (String id : ids) {
       if (++n % 10 == 0) progress.update("Theta Vaultと同期中 " + n + " / " + ids.size());
@@ -192,6 +196,21 @@ public final class VaultSync {
       }
       if (n % 20 == 0) saveIndex(x.s, index);
     }
+    // Children of notes that were renamed (or written for the first time) carry the new
+    // "up: [[…]]" link to Obsidian.
+    if (!x.renamed.isEmpty())
+      for (JSONObject c : x.s.all()) {
+        if (!x.renamed.contains(c.optString("parent"))) continue;
+        Remote R = x.remote.get(c.getString("id"));
+        JSONObject I = x.known.optJSONObject(c.getString("id"));
+        if (R == null || I == null || !I.optString("lh").equals(Sync.hash(c))) continue;
+        try {
+          push(x, c, R);
+          x.res.up--;
+        } catch (Exception e) {
+          x.res.errors.add(label(c, c.getString("id")) + "：" + e.getMessage());
+        }
+      }
     saveIndex(x.s, index);
     return x.res;
   }
@@ -346,9 +365,24 @@ public final class VaultSync {
       for (int i = 2; used.contains(name) && !(R != null && !move && name.equals(R.name)); i++) name = base + " (" + i + ").md";
       used.add(name);
     }
+    if (!L.optString("parent").isEmpty()) {
+      JSONObject P = x.known.optJSONObject(L.optString("parent"));
+      if (P != null && !P.optString("name").isEmpty()) {
+        L = new JSONObject(L.toString());
+        L.put("upName", title(P.optString("name")));
+      }
+    }
     byte[] body = NoteCodec.render(L).getBytes(StandardCharsets.UTF_8);
     JSONObject r = x.d.put(R != null ? R.fileId : "", folder, name, body, move ? folder : "", move ? R.folder : "");
-    record(x, L.getString("id"), r.getString("id"), r.optString("md5Checksum"), Sync.hash(L), r.optString("name", name));
+    String finalName = r.optString("name", name);
+    if (R == null || !finalName.equals(R.name)) x.renamed.add(L.getString("id"));
+    record(x, L.getString("id"), r.getString("id"), r.optString("md5Checksum"), Sync.hash(L), finalName);
+    Remote now = new Remote();
+    now.fileId = r.getString("id");
+    now.name = finalName;
+    now.folder = folder;
+    now.md5 = r.optString("md5Checksum");
+    x.remote.put(L.getString("id"), now);
     x.res.up++;
   }
 
@@ -370,6 +404,14 @@ public final class VaultSync {
       for (String k : Sync.LOCAL) if (current.has(k)) theirs.put(k, current.get(k));
     }
     boolean needsId = theirs.optBoolean("vaultNewId");
+    // Nested in Obsidian with "up: [[Parent]]" only: find the parent and write its id once.
+    if (theirs.optString("parent").isEmpty() && !theirs.optString("upName").isEmpty()) {
+      String pid = x.byTitle.get(theirs.optString("upName"));
+      if (pid != null && !pid.equals(id)) {
+        theirs.put("parent", pid);
+        needsId = true;
+      }
+    }
     theirs.remove("vaultNewId");
     x.s.putSynced(theirs);
     if (needsId || !NoteCodec.folder(theirs).equals(folderName(x, R.folder)) && x.managedIds.contains(R.folder)) {

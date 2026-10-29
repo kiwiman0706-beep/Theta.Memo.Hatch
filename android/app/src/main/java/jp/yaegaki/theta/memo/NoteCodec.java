@@ -21,8 +21,11 @@ public final class NoteCodec {
 
   // Frontmatter keys this app owns, in output order.
   static final String[] ORDER = {
-    "theta", "rev", "id", "title", "color", "pinned", "archived", "trashed", "tags", "source", "import_key", "created", "updated"
+    "theta", "rev", "id", "title", "color", "pinned", "archived", "trashed", "gtd", "important", "urgent", "due", "contexts",
+    "waiting_for", "done", "parent", "up", "view", "tags", "source", "import_key", "created", "updated"
   };
+  // GTD lists (docs/GTD.md). A note without "gtd" is an ordinary memo.
+  public static final String[] GTD = {"inbox", "next", "waiting", "scheduled", "someday", "project", "reference", "done"};
   static final Set<String> OWN = new HashSet<>(Arrays.asList(ORDER));
   // Obsidian Web Clipper and other tools write these; they are read as ours when present.
   static final String[] CREATED_ALIASES = {"created", "date", "published"};
@@ -162,6 +165,24 @@ public final class NoteCodec {
     if (n.optBoolean("pinned")) m.put("pinned", true);
     if (n.optBoolean("archived")) m.put("archived", true);
     if (n.optLong("trashed") > 0) m.put("trashed", iso(n.optLong("trashed")));
+    if (!n.optString("gtd").isEmpty()) m.put("gtd", n.optString("gtd"));
+    if (n.optBoolean("important")) m.put("important", true);
+    if (n.optBoolean("urgent")) m.put("urgent", true);
+    if (!n.optString("due").isEmpty()) m.put("due", n.optString("due"));
+    JSONArray ctx = n.optJSONArray("contexts");
+    if (ctx != null && ctx.length() > 0) {
+      List<Object> t = new ArrayList<>();
+      for (int i = 0; i < ctx.length(); i++) t.add(ctx.getString(i));
+      m.put("contexts", t);
+    }
+    if (!n.optString("waitingFor").isEmpty()) m.put("waiting_for", n.optString("waitingFor"));
+    if (n.optLong("done") > 0) m.put("done", iso(n.optLong("done")));
+    if (!n.optString("parent").isEmpty()) {
+      m.put("parent", n.optString("parent"));
+      // For Obsidian (Breadcrumbs and plain links): the parent's file, filled in by sync.
+      if (!n.optString("upName").isEmpty()) m.put("up", "[[" + n.optString("upName") + "]]");
+    }
+    if (!n.optString("view").isEmpty()) m.put("view", n.optString("view"));
     JSONArray labels = n.optJSONArray("labels");
     if (labels != null && labels.length() > 0) {
       List<Object> t = new ArrayList<>();
@@ -266,6 +287,29 @@ public final class NoteCodec {
     if (source == null) source = fm.get("url");
     n.put("source", source instanceof Collection ? (((Collection<?>) source).isEmpty() ? "" : str(((Collection<?>) source).iterator().next())) : str(source));
     n.put("importKey", str(fm.get("import_key")));
+    String gtd = str(fm.get("gtd")).toLowerCase(Locale.ROOT);
+    n.put("gtd", Arrays.asList(GTD).contains(gtd) ? gtd : "");
+    if (!gtd.isEmpty() && !Arrays.asList(GTD).contains(gtd)) n.put("gtdRaw", str(fm.get("gtd")));
+    n.put("important", truthy(fm.get("important")));
+    n.put("urgent", truthy(fm.get("urgent")));
+    String due = str(fm.get("due"));
+    n.put("due", due.matches("\\d{4}-\\d{2}-\\d{2}.*") ? due.substring(0, 10) : "");
+    JSONArray contexts = new JSONArray();
+    Object cx = fm.get("contexts");
+    if (cx instanceof Collection) {
+      for (Object t : (Collection<?>) cx) if (t != null && !str(t).isEmpty()) contexts.put(str(t));
+    } else if (cx != null) for (String t : str(cx).split("[,\\s]+")) if (!t.isEmpty()) contexts.put(t);
+    n.put("contexts", contexts);
+    n.put("waitingFor", str(fm.get("waiting_for")));
+    n.put("done", fm.get("done") == null ? 0 : ms(fm.get("done"), fileTime));
+    n.put("parent", str(fm.get("parent")));
+    // A link written in Obsidian ("up: [[Parent]]") without our id: sync resolves it by file name.
+    Object upv = fm.get("up");
+    while (upv instanceof Collection && !((Collection<?>) upv).isEmpty()) upv = ((Collection<?>) upv).iterator().next();
+    String up = upv instanceof Collection ? "" : str(upv);
+    if (up.startsWith("[[")) up = up.replaceAll("^\\[\\[|\\]\\]$", "").replaceAll("[|#].*$", "");
+    if (!up.isEmpty()) n.put("upName", up.substring(up.lastIndexOf('/') + 1).replaceFirst("(?i)\\.md$", ""));
+    n.put("view", str(fm.get("view")).toLowerCase(Locale.ROOT).equals("mindmap") ? "mindmap" : "");
     long created = 0;
     for (String k : CREATED_ALIASES) if (created == 0 && fm.get(k) != null) created = ms(fm.get(k), 0);
     long updated = ms(fm.get("updated"), 0);
@@ -280,6 +324,7 @@ public final class NoteCodec {
     if (n.has("colorRaw")) {
       extra.put("color", n.remove("colorRaw"));
     }
+    if (n.has("gtdRaw")) extra.put("gtd", n.remove("gtdRaw"));
     if (extra.length() > 0) n.put("extra", extra);
     return n;
   }

@@ -10,6 +10,8 @@ Google Keep のような付箋の壁のメモアプリ。ただしデータは *
 | 音声メモ（音声認識つき、音声ファイルも残す） | ブラウザからのスクラップ（Android の共有、PC・Mac は Obsidian Web Clipper） |
 | ウィジェット（1つのメモ・メモ一覧） | PC・Mac・Android で同期（Google ドライブ） |
 | | Google Keep から Takeout で取り込み |
+| | GTD（受信箱・整理・次にやる・待ち・予定・プロジェクト・週次レビュー）とアイゼンハワーマトリクス |
+| | 入れ子（子メモ・アウトライン）とマインドマップ（[docs/GTD.md](docs/GTD.md)） |
 
 ## 使い始める
 
