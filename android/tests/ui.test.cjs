@@ -55,13 +55,15 @@ const MOCK = `
     var q = JSON.parse(s); window.__calls.push(q);
     var send = function (type, data) { setTimeout(function () { window.onNative({ type: type, data: data }); }, 0); };
     if (q.action === 'boot') {
-      send('state', { version: '0.1.0', platform: 'android', layout: 'grid', syncEnabled: true, lastSync: Date.now(), transcribe: 'auto', appPackage: 'jp.yaegaki.theta.memo', appSha1: 'AA:BB' });
+      send('state', { version: '0.1.0', platform: 'android', layout: 'grid', syncEnabled: true, lastSync: Date.now(), transcribe: 'auto', appPackage: 'app.thetahatch.memo', appSha1: 'AA:BB' });
       send('notes', ${JSON.stringify(NOTES)});
     }
     if (q.action === 'camera') send('attached', { note: q.note, files: [{ name: 'cam1.jpg', label: '', mime: 'image/jpeg' }] });
     if (q.action === 'record') send('recording', { note: q.note, start: Date.now() });
     if (q.action === 'stopRecord') { var n = window.__calls.filter(function (c) { return c.action === 'record'; }).pop().note; send('recorded', { note: n, name: 'rec2.m4a', duration: 3000 });
       setTimeout(function () { window.onNative({ type: 'transcript', data: { note: n, name: 'rec2.m4a', text: '書き起こしのテスト' } }); }, 30); }
+    if (q.action === 'nasSave') send('nasStatus', { state: 'otp', message: '2 段階認証のコードを入れてください' });
+    if (q.action === 'nasOtp') send('nasStatus', { state: q.code === '123456' ? 'ok' : 'error', message: 'x' });
     if (q.action === 'saveInk') send('inkSaved', { note: q.note, req: q.req, name: 'ink1.ink.png' });
   } };
 `;
@@ -283,6 +285,36 @@ const MOCK = `
     await g.click('.mm-bar .icon >> nth=0');
     assert.ok(await g.locator('.editor .rt', { hasText: '数値目標' }).count(), 'editor shows the new branch');
     await g.context().close();
+    passed++;
+  }
+
+  // Series skins: every skin renders without sideways scroll or errors; NAS setup asks for the 2-step code
+  {
+    const k = await page(390, 844);
+    for (const skin of ['dark', 'light', 'pop', 'alert', 'scifi', 'term', 'braun', 'soft', 'window', 'lcd', 'system']) {
+      await k.evaluate(sk => window.onNative({ type: 'state', data: Object.assign({}, App.state, { skin: sk }) }), skin);
+      assert.strictEqual(await k.evaluate(() => document.documentElement.getAttribute('data-theta-skin')), skin);
+      const o = await k.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
+      assert.ok(o <= 0, skin + ' overflow ' + o);
+      if (['dark', 'pop', 'scifi'].includes(skin)) await k.screenshot({ path: path.join(SHOTS, 'skin-' + skin + '.png') });
+    }
+    assert.strictEqual(await k.evaluate(() => { window.onNative({ type: 'state', data: Object.assign({}, App.state, { skin: 'dark' }) }); return document.documentElement.hasAttribute('data-dark'); }), true, 'dark skin uses dark note colours');
+    await k.click('#menu');
+    await k.click('.drawer-item:has-text("設定")');
+    await k.click('.vault-row button:has-text("NAS を設定する")');
+    await k.locator('.sheet').last().locator('input').nth(0).fill('100.64.0.5');
+    await k.locator('.sheet').last().locator('input').nth(1).fill('taro');
+    await k.locator('.sheet').last().locator('input').nth(2).fill('secret');
+    await k.locator('.sheet').last().locator('input').nth(3).fill('/home/Obsidian');
+    k.once('dialog', d => d.accept('123456'));
+    await k.locator('.sheet').last().locator('.sheet-buttons button:has-text("保存して同期を始める")').click();
+    await k.waitForTimeout(300);
+    const calls = await k.evaluate(() => window.__calls.filter(c => /^nas/.test(c.action)));
+    assert.deepStrictEqual(calls.map(c => c.action), ['nasSave', 'nasOtp']);
+    assert.strictEqual(calls[0].root, '/home/Obsidian');
+    assert.strictEqual(calls[1].code, '123456');
+    assert.strictEqual(calls[1].start, true);
+    await k.context().close();
     passed++;
   }
 

@@ -1,11 +1,11 @@
 # Theta Memo Hatch のデータの形（Theta Vault）
 
-Theta Hatch シリーズ共通の [Theta Vault 仕様](https://github.com/kiwiman0706-beep/MeishiApp/blob/main/docs/THETA_VAULT_SPEC.md) に従います。**Obsidianでそのまま開けるフォルダ**が正本で、アプリはそれを読み書きするビューア兼エディタです。
+Theta Hatch シリーズ共通の [Theta Vault 仕様](https://github.com/kiwiman0706-beep/Theta.Hatch.Series/blob/HEAD/spec/THETA_VAULT_SPEC.md) に従います。**Obsidianでそのまま開けるフォルダ**が正本で、アプリはそれを読み書きするビューア兼エディタです。
 
 ## フォルダ
 
 ```
-Theta Vault/                      ← Googleドライブのマイドライブ直下（Meishi と共有）
+Theta Vault/                      ← NAS の選んだフォルダの中（正本）と、Googleドライブのマイドライブ直下（どちらか・両方）
 ├── .theta/
 │   ├── vault.json                ← {"spec":1,"apps":["meishi","memo",…]}（"memo" を追記）
 │   └── trash/                    ← 完全に削除したメモはここへ移動（戻せる）
@@ -14,6 +14,7 @@ Theta Vault/                      ← Googleドライブのマイドライブ直
     ├── Archive/                  ← アーカイブしたメモ
     ├── Trash/                    ← アプリのゴミ箱（30日後に .theta/trash へ）
     ├── Clippings/                ← Obsidian Web Clipper の保存先（PC・Macのスクラップ）
+    ├── メモ.base                 ← Obsidian Bases の一覧（カード・表・GTD）。無ければアプリが置く
     └── _files/                   ← 添付（写真・PDF・録音・手書き・あらゆるファイル）
 ```
 
@@ -87,6 +88,13 @@ Theta Meishi Hatch と同じ規則（`VaultSync.java`）。
 - 片側だけ変わった → その側を採用。**両側で変わった** → 色・固定・ラベル等は新しい方（ラベルは和集合）。本文が食い違うときは新しい方を残し、**もう一方を「（競合 日時）」付きの別メモとして残す**（どちらの端末で書いた文も失わない）。
 - 編集は削除に勝つ。削除は `.theta/trash/` へ移動。一度に多数（max(5, 30%)超）が消えて見えるときは端末側を削除しない。
 - いつ：アプリを開いたとき・戻ったとき（5分以上たっていれば）・離れたとき、1時間ごと（バックグラウンド）、メニューの「今すぐ同期」。
+
+## NAS と Google ドライブ（両方使うとき）
+
+- **NAS が正本**です。同期は NAS → Google ドライブの順。ドライブ側で変わったもの（PC の Obsidian、Meishi など）があれば、同じ回に NAS へもう一度同期して揃えます。
+- 端末の記録は Vault ごと（`vault-sync-nas.json`・`vault-sync.json`）。削除の印（墓標）は、両方の Vault に伝わるまで残します（どちらで消しても、もう一方から戻ってこない）。
+- NAS は Synology の File Station API（Tailscale 経由）。2 段階認証（Secure SignIn）はコードを 1 回入れれば、デバイストークンで次から不要。自己署名の証明書は指紋を確かめて信頼します。NAS の変更の検出は、ファイルの大きさと更新時刻です。
+- Obsidian でサブフォルダへ移したノートは、NAS ではファイル名で探して追いかけます。
 
 ## Google Keep（Takeout）の対応表
 

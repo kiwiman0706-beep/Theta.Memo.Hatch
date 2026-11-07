@@ -37,7 +37,7 @@
 
   window.onNative = function (msg) {
     var t = msg.type, d = msg.data;
-    if (t === 'state') { App.state = d || {}; applyTheme(); renderChrome(); if (sheetRefresh) sheetRefresh(); }
+    if (t === 'state') { App.state = d || {}; applyTheme(); renderChrome(); if (sheetRefresh) sheetRefresh(); setTimeout(seriesOffer, 600); }
     else if (t === 'notes') { setNotes(d || []); }
     else if (t === 'toast') App.toast(d);
     else if (t === 'error') App.toast(d, true);
@@ -604,7 +604,7 @@
     banner.innerHTML = '';
     if (App.state.update) {
       var u = App.state.update;
-      var b2 = el('button', 'banner', '新しい版 ' + u.version + ' があります — ' + (u.ready ? 'タップして更新' : 'タップしてダウンロード'));
+      var b2 = el('button', 'banner', '新しい版 ' + u.version + ' があります — ' + (u.hub ? 'タップして Home Hatch で更新' : 'タップして Releases を開く'));
       b2.onclick = function () { App.native('installUpdate'); };
       banner.appendChild(b2);
     }
@@ -805,24 +805,44 @@
     var body = el('div', 'settings');
     body.appendChild(el('h3', '', '同期（Theta Vault）'));
     var sync = el('div', 'sync-box');
-    sync.appendChild(el('p', '', st.syncEnabled
-      ? 'Google Driveの「Theta Vault/Memo/」と同期しています。' + (st.lastSync ? '最終：' + when(st.lastSync) : '')
-      : 'メモはこの端末だけにあります。Google Driveと同期すると、PC・Macでも（Obsidianでも）開けます。'));
+    sync.appendChild(el('p', '', st.nasEnabled || st.syncEnabled
+      ? '「Theta Vault/Memo/」と同期しています。' + (st.lastSync ? '最終：' + when(st.lastSync) : '')
+      : 'メモはこの端末だけにあります。NAS や Google ドライブと同期すると、ほかの端末や PC・Mac（Obsidian）でも開けます。'));
     if (st.syncError) sync.appendChild(el('p', 'error-text', st.syncError));
-    var row = el('div', 'button-row');
-    var b1 = el('button', 'primary', st.syncEnabled ? '今すぐ同期' : '同期を始める');
-    b1.onclick = function () { App.native('syncNow'); };
-    row.appendChild(b1);
-    var b2 = el('button', '', '初期設定ガイド');
-    b2.onclick = function () { setupGuide(''); };
-    row.appendChild(b2);
-    if (st.syncEnabled) {
-      var b3 = el('button', '', '同期を止める');
-      b3.onclick = function () { App.native('syncOff'); };
-      row.appendChild(b3);
+    if (st.nasEnabled || st.syncEnabled) {
+      var now = el('button', 'primary', '今すぐ同期');
+      now.onclick = function () { App.native('syncNow'); };
+      sync.appendChild(wrapRow([now]));
     }
-    sync.appendChild(row);
+    // NAS: the primary copy
+    var nb = el('div', 'vault-row');
+    nb.appendChild(el('b', '', 'NAS（正本）'));
+    nb.appendChild(el('span', 'muted', st.nasEnabled ? (st.nasUrl + '　' + st.nasRoot + '/Theta Vault') : st.nasUrl ? '止めています' : 'まだ設定していません'));
+    var n1 = el('button', st.nasEnabled ? '' : 'primary', st.nasEnabled ? '設定' : 'NAS を設定する');
+    n1.onclick = function () { nasDialog(); };
+    var nrow = [n1];
+    if (st.nasEnabled) { var n2 = el('button', '', '止める'); n2.onclick = function () { App.native('syncOff', { target: 'nas' }); }; nrow.push(n2); }
+    nb.appendChild(wrapRow(nrow));
+    sync.appendChild(nb);
+    // Google Drive: a copy for PC / Mac (Google Drive for desktop + Obsidian) and other series apps
+    var db = el('div', 'vault-row');
+    db.appendChild(el('b', '', 'Google ドライブ'));
+    db.appendChild(el('span', 'muted', st.syncEnabled ? 'マイドライブ/Theta Vault' : '止めています'));
+    var d1 = el('button', st.syncEnabled ? '' : 'primary', st.syncEnabled ? '止める' : '同期を始める');
+    d1.onclick = function () { App.native(st.syncEnabled ? 'syncOff' : 'syncNow', { target: 'drive' }); };
+    var d2 = el('button', '', '初期設定ガイド');
+    d2.onclick = function () { setupGuide(''); };
+    db.appendChild(wrapRow([d1, d2]));
+    sync.appendChild(db);
+    if (st.nasEnabled && st.syncEnabled) sync.appendChild(el('p', 'muted', '両方使うときは NAS が正本です。NAS → Google ドライブの順に同期し、ドライブ側（PC の Obsidian など）で変えたものも NAS に戻します。'));
     body.appendChild(sync);
+    if ((st.series && st.series.length) || st.seriesError) {
+      var ser = el('button', 'choice');
+      ser.innerHTML = '<b>Theta Hatch シリーズの共通設定</b><span></span>';
+      ser.lastChild.textContent = st.seriesError ? '⚠ ' + st.seriesError : 'スキン・Gemini のモデル・NAS を、ほかのシリーズのアプリと揃えるか選べます';
+      ser.onclick = seriesSheet;
+      body.appendChild(ser);
+    }
 
     body.appendChild(el('h3', '', '音声メモ'));
     body.appendChild(field('書き起こし', select([
@@ -855,11 +875,11 @@
     body.appendChild(saveKey);
 
     body.appendChild(el('h3', '', '表示'));
-    body.appendChild(field('テーマ', select([['auto', '端末に合わせる'], ['light', 'ライト'], ['dark', 'ダーク']], st.theme || 'auto', function (v) {
-      App.native('settings', { theme: v });
-      App.state.theme = v;
+    body.appendChild(field('スキン', select(SKINS, st.skin || 'system', function (v) {
+      App.native('settings', { skin: v });
+      App.state.skin = v;
       applyTheme();
-    })));
+    }), 'Theta Hatch シリーズ共通の見た目です。シリーズに合わせる設定なら、Home Hatch などで変えたスキンも届きます。'));
     var so = el('label', 'check-row');
     var cb = el('input');
     cb.type = 'checkbox';
@@ -872,7 +892,7 @@
     body.appendChild(el('h3', '', 'このアプリ'));
     body.appendChild(el('p', 'muted', 'Theta Memo Hatch ' + (st.version || '') + '　データの形式：Theta Vault（Obsidian形式）'));
     var upd = el('button', '', '更新を確認');
-    upd.onclick = function () { App.native('installUpdate'); };
+    upd.onclick = function () { App.native('installUpdate', { check: true }); };
     body.appendChild(upd);
     App.sheet('設定', body, [['閉じる']], { wide: true });
   }
@@ -908,12 +928,120 @@
     App.sheet('Google連携の初期設定ガイド', body, [['閉じる'], ['同期を始める', function () { App.native('syncNow'); }, 'primary']], { wide: true });
   }
 
-  // ---- theme ----------------------------------------------------------------------------
+  // ---- skin (Theta Hatch series: lib/theta-skins.css) -----------------------------------------
+
+  var SKINS = [['system', '端末に合わせる'], ['dark', 'ダーク（HUD）'], ['light', 'ライト'], ['pop', 'POP'], ['alert', 'ALERT'], ['scifi', 'SCI-FI'],
+    ['term', 'TERM'], ['braun', 'BRAUN'], ['soft', 'SOFT'], ['window', 'WINDOW'], ['lcd', 'LCD']];
 
   function applyTheme() {
-    var t = App.state.theme || 'auto';
-    var dark = t === 'dark' || (t === 'auto' && window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches);
-    document.documentElement.dataset.theme = dark ? 'dark' : 'light';
+    var html = document.documentElement;
+    html.setAttribute('data-theta-skin', App.state.skin || 'system');
+    // Note colours have a light and a dark set; the skin says which (its color-scheme).
+    var dark = /dark/.test(getComputedStyle(html).colorScheme || '');
+    if (dark) html.setAttribute('data-dark', ''); else html.removeAttribute('data-dark');
+  }
+
+  function wrapRow(buttons) {
+    var r = el('div', 'button-row');
+    buttons.forEach(function (b) { r.appendChild(b); });
+    return r;
+  }
+
+  // ---- NAS --------------------------------------------------------------------------------
+
+  var nasStart = false;
+  function nasDialog() {
+    var st = App.state;
+    var body = el('div', 'settings');
+    body.appendChild(el('p', 'muted', 'Synology の NAS（Tailscale でつなぐ）に Theta Vault を置き、正本にします。2 段階認証（Secure SignIn）のコードは最初の 1 回だけ聞きます。'));
+    if (st.hub) {
+      var h = el('button', 'choice');
+      h.innerHTML = '<b></b><span>接続先・アカウント・パスワード・2 段階認証の記憶を受け取ります</span>';
+      h.firstChild.textContent = st.hub + ' の NAS の設定を使う';
+      h.onclick = function () {
+        if (!confirm(st.hub + ' から NAS の接続先とパスワードを受け取ります。よろしいですか？')) return;
+        close();
+        App.native('nasFromHub');
+      };
+      body.appendChild(h);
+    }
+    var url = el('input'); url.value = st.nasUrl || ''; url.placeholder = '100.x.x.x（Tailscale の IP）や ds.example.ts.net:5001'; url.autocomplete = 'off';
+    var user = el('input'); user.value = st.nasAccount || ''; user.autocomplete = 'off';
+    var pass = el('input'); pass.type = 'password'; pass.placeholder = st.nasPasswordSet ? '設定済み（変えるときだけ入力）' : ''; pass.autocomplete = 'off';
+    var root = el('input'); root.value = st.nasRoot || ''; root.placeholder = '/home/Obsidian'; root.autocomplete = 'off';
+    body.appendChild(field('接続先', url, 'ポートを書かなければ http の 5000 番につなぎます。'));
+    body.appendChild(field('アカウント', user));
+    body.appendChild(field('パスワード', pass, 'この端末の中で暗号化して保存します。Vault・同期には入れません。'));
+    body.appendChild(field('Theta Vault を置くフォルダ', root, '共有フォルダの名前から（例 /home/Obsidian）。この中の「Theta Vault」を使います（無ければ作ります）。'));
+    function save(start) {
+      nasStart = start;
+      App.native('nasSave', { url: url.value, user: user.value, password: pass.value, root: root.value, start: start });
+    }
+    var close = App.sheet('NAS', body, [['閉じる'], ['接続を確かめる', function () { save(false); return false; }], ['保存して同期を始める', function () { save(true); }, 'primary']], { wide: true });
+  }
+
+  App.on('nasStatus', function (d) {
+    if (!d) return;
+    if (d.state === 'ok') App.toast(nasStart ? 'NAS につながりました。同期を始めます' : 'NAS につながりました');
+    else if (d.state === 'otp') {
+      var code = prompt((d.message || '2 段階認証のコード') + '\n（Secure SignIn・認証アプリの 6 桁）', '');
+      if (code && code.trim()) App.native('nasOtp', { code: code.trim(), start: nasStart });
+    } else if (d.state === 'cert') {
+      if (confirm('NAS の証明書を端末が信頼していません（自己署名など）。\n指紋（SHA-256）：\n' + d.cert + '\n\nNAS の「コントロールパネル → セキュリティ → 証明書」の指紋と同じなら、信頼してください。'))
+        App.native('nasTrust', { cert: d.cert, start: nasStart });
+    } else App.toast(d.message || 'NAS につながりません', true);
+  });
+
+  // ---- series settings (.theta/settings.json and the hub) -------------------------------------
+
+  function seriesValue(k, v) {
+    if (v == null || v === '') return '（なし）';
+    if (k === 'ui.skin') { for (var i = 0; i < SKINS.length; i++) if (SKINS[i][0] === v) return SKINS[i][1]; }
+    return typeof v === 'object' ? JSON.stringify(v) : String(v);
+  }
+
+  function seriesSheet() {
+    var st = App.state;
+    var body = el('div', 'settings');
+    if (st.seriesError) body.appendChild(el('p', 'error-text', st.seriesError));
+    body.appendChild(el('p', 'muted', 'オンの項目は「シリーズ共通」：ほかの Theta Hatch アプリ（Home Hatch など）と同じ値を使い、ここで変えるとほかにも届きます。オフは「このアプリだけ」。'));
+    (st.series || []).forEach(function (it) {
+      var row = el('label', 'check-row');
+      var cb = el('input');
+      cb.type = 'checkbox';
+      cb.checked = !!it.follow;
+      cb.onchange = function () { App.native('seriesFollow', { key: it.key, on: cb.checked }); };
+      row.appendChild(cb);
+      var t = el('span', '');
+      t.appendChild(el('b', '', it.label));
+      t.appendChild(el('br'));
+      t.appendChild(el('small', 'muted', it.follow ? 'シリーズ：' + seriesValue(it.key, it.value) + (it.by ? '（' + it.by + '）' : '') : 'このアプリ：' + seriesValue(it.key, it.mine)));
+      row.appendChild(t);
+      body.appendChild(row);
+    });
+    App.sheet('シリーズの共通設定', body, [['閉じる']]);
+  }
+
+  function seriesOffer() {
+    var offers = App.state.seriesOffer || [];
+    if (!offers.length || App.offerShown) return;
+    App.offerShown = true;
+    var body = el('div', 'settings');
+    body.appendChild(el('p', 'muted', 'Theta Vault に、ほかの Theta Hatch アプリで使っている設定があります。引き継ぐ項目を選んでください（APIキーなどの秘密は引き継ぎません）。'));
+    var boxes = offers.map(function (o) {
+      var row = el('label', 'check-row');
+      var cb = el('input');
+      cb.type = 'checkbox';
+      cb.checked = true;
+      row.appendChild(cb);
+      row.appendChild(el('span', '', o.label + '：' + seriesValue(o.key, o.value) + (o.by ? '（' + o.by + '）' : '')));
+      body.appendChild(row);
+      return cb;
+    });
+    App.sheet('シリーズの設定を引き継ぐ', body, [
+      ['引き継がない', function () { App.native('seriesAdopt', { keys: [] }); }],
+      ['選んだ項目を引き継ぐ', function () { App.native('seriesAdopt', { keys: offers.filter(function (o, i) { return boxes[i].checked; }).map(function (o) { return o.key; }) }); }, 'primary']
+    ]);
   }
   if (window.matchMedia) try { matchMedia('(prefers-color-scheme: dark)').addEventListener('change', applyTheme); } catch (e) {}
 

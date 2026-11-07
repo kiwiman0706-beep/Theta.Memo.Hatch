@@ -11,14 +11,14 @@ Keepに無い「他のアプリとの連携」は、**データがObsidian形式
 
 ## Theta Home Hatch（Android）
 
-同じ署名鍵のシリーズアプリから使える入口です（権限 `jp.yaegaki.theta.permission.SHARE`）。
+同じ署名鍵（シリーズ共通）のアプリから使える入口です（権限 `app.thetahatch.permission.SHARE`）。
 
 | 用途 | 方法 |
 | --- | --- |
-| メモの一覧を出す | `content://jp.yaegaki.theta.memo.theta/notes?limit=50` を query。列：`id, title, snippet, color, pinned, updated, cover`（固定 → 新しい順、アーカイブ・ゴミ箱は除く） |
-| メモを開く | `Intent(MainActivity)`、extra `open` = id（パッケージ `jp.yaegaki.theta.memo`） |
-| 新しいメモ | action `jp.yaegaki.theta.memo.NEW`、extra `type` = `text` / `list` / `ink` / `audio` / `photo` / `file`、任意で `android.intent.extra.TEXT` |
-| シリーズの発見 | action `jp.yaegaki.theta.HATCH`（Meishi と同じ） |
+| メモの一覧を出す | `content://app.thetahatch.memo.theta/notes?limit=50` を query。列：`id, title, snippet, color, pinned, updated, cover`（固定 → 新しい順、アーカイブ・ゴミ箱は除く） |
+| メモを開く | `Intent(MainActivity)`、extra `open` = id（パッケージ `app.thetahatch.memo`） |
+| 新しいメモ | action `app.thetahatch.memo.NEW`、extra `type` = `text` / `list` / `ink` / `audio` / `photo` / `file`、任意で `android.intent.extra.TEXT` |
+| シリーズの発見 | action `app.thetahatch.HATCH` |
 | 画像のサムネイル | Vaultの `Memo/_files/<cover>` を読む（Home Hatch が Vault に対応したとき） |
 
 Home Hatch の「記録」ドロワー（録音・Sペン）から `NEW` を呼ぶと、記録をそのままメモにできます。
@@ -27,6 +27,12 @@ Home Hatch の「記録」ドロワー（録音・Sペン）から `NEW` を呼�
 
 - 今：DeskHatch の付箋（sticky）とスクラップは `.md` ファイルを読み書きする作りなので、`Theta Vault/Memo/Notes/` のファイルをそのまま付箋として貼れます。
 - 次：シリーズ共通仕様 §7 の「Theta Hatchプラグイン」ドロワー。共通UI（`android/app/src/main/assets/`）はブラウザでも動くように作ってあり（`Native` のブリッジだけ差し替え）、デスクトップ版（Electron）・Web版（PWA）は Meishi と同じ形で追加予定です。
+
+## 設定と更新のハブ（Theta Home Hatch・KidsHome Hatch）
+
+- 更新：アプリは自分で入れません（インストールの権限を持たない）。「更新する」で `app.thetahatch.action.UPDATE`（extra `packageName`）をハブに送り、ハブが無ければ Releases ページを開きます。
+- 共通設定：起動時にハブの `content://app.thetahatch.home.theta/info` を読み、「シリーズに合わせる」項目（スキン・Gemini のモデル・NAS の接続先）を取り込みます。ここで変えたらハブに書き戻します。Gemini の API キーと NAS のパスワード・デバイストークンは、設定画面で利用者が選んだときだけ `secret/…` から受け取ります。
+- Vault の `.theta/settings.json` も、同期のたびに NAS と Google ドライブの両方で読み書きします。
 
 ## Meishi など他のシリーズアプリ
 

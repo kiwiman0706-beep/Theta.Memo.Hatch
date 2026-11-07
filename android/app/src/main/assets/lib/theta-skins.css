@@ -1,0 +1,315 @@
+/* 生成ファイル：tools/gen_skins.py で design/skins/skins.json から作る。手で直さない。
+   <html data-theta-skin="dark|light|pop|alert|scifi|term|braun|soft|window|lcd|system">（html 以外の要素に付けてもその中だけ切り替わる）。無い・system は端末のダーク／ライトに合わせる。
+   書体：<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@300;400;600&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+   （アプリに同梱するときは design/hud-kit/compose/res/font/ の ttf とライセンスを使う） */
+:root {
+  --bg: #F4F3EE;
+  --panel: #FFFFFF;
+  --raised: #E9E8E2;
+  --fg: #121212;
+  --muted: #474747;
+  --faint: #5E5E5E;
+  --line: #BDBCB4;
+  --accent: #B8400C;
+  --on-accent: #FFFFFF;
+  --widget: #121212;
+  --launch: #6A6A6A;
+  --zebra: rgba(0,0,0,0.051);
+  --accent2: #B8400C;
+  --accent3: #B8400C;
+  --radius: 0px;
+  --line-width: 1px;
+  --hazard: 4px;
+  --shadow: none;
+  --icon-radius: 0;
+  --display: "Oswald", "Noto Sans JP", sans-serif;
+  --mono: "Share Tech Mono", ui-monospace, "Noto Sans JP", monospace;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theta-skin]), :root[data-theta-skin="system"] {
+    --bg: #0A0A0B;
+    --panel: #111113;
+    --raised: #19191C;
+    --fg: #EDEDED;
+    --muted: #A3A3A3;
+    --faint: #858585;
+    --line: #333336;
+    --accent: #FF6B1A;
+    --on-accent: #0A0A0B;
+    --widget: #EDEDED;
+    --launch: #7A7A7E;
+    --zebra: rgba(255,255,255,0.059);
+    --accent2: #FF6B1A;
+    --accent3: #FF6B1A;
+    --radius: 0px;
+    --line-width: 1px;
+    --hazard: 4px;
+    --shadow: none;
+    --icon-radius: 0;
+    --display: "Oswald", "Noto Sans JP", sans-serif;
+    --mono: "Share Tech Mono", ui-monospace, "Noto Sans JP", monospace;
+    color-scheme: dark;
+  }
+}
+[data-theta-skin="dark"] {
+  --bg: #0A0A0B;
+  --panel: #111113;
+  --raised: #19191C;
+  --fg: #EDEDED;
+  --muted: #A3A3A3;
+  --faint: #858585;
+  --line: #333336;
+  --accent: #FF6B1A;
+  --on-accent: #0A0A0B;
+  --widget: #EDEDED;
+  --launch: #7A7A7E;
+  --zebra: rgba(255,255,255,0.059);
+  --accent2: #FF6B1A;
+  --accent3: #FF6B1A;
+  --radius: 0px;
+  --line-width: 1px;
+  --hazard: 4px;
+  --shadow: none;
+  --icon-radius: 0;
+  --display: "Oswald", "Noto Sans JP", sans-serif;
+  --mono: "Share Tech Mono", ui-monospace, "Noto Sans JP", monospace;
+  color-scheme: dark;
+}
+[data-theta-skin="light"] {
+  --bg: #F4F3EE;
+  --panel: #FFFFFF;
+  --raised: #E9E8E2;
+  --fg: #121212;
+  --muted: #474747;
+  --faint: #5E5E5E;
+  --line: #BDBCB4;
+  --accent: #B8400C;
+  --on-accent: #FFFFFF;
+  --widget: #121212;
+  --launch: #6A6A6A;
+  --zebra: rgba(0,0,0,0.051);
+  --accent2: #B8400C;
+  --accent3: #B8400C;
+  --radius: 0px;
+  --line-width: 1px;
+  --hazard: 4px;
+  --shadow: none;
+  --icon-radius: 0;
+  --display: "Oswald", "Noto Sans JP", sans-serif;
+  --mono: "Share Tech Mono", ui-monospace, "Noto Sans JP", monospace;
+  color-scheme: light;
+}
+[data-theta-skin="pop"] {
+  --bg: #FAF6EC;
+  --panel: #FFFFFF;
+  --raised: #F2EDE0;
+  --fg: #2B2B2B;
+  --muted: #4F4F4F;
+  --faint: #6B6B6B;
+  --line: #2B2B2B;
+  --accent: #EF6F51;
+  --on-accent: #FFFFFF;
+  --widget: #7FCFB5;
+  --launch: #F2BE2E;
+  --zebra: rgba(245,200,66,0.149);
+  --accent2: #F5C842;
+  --accent3: #A8E2CF;
+  --radius: 10px;
+  --line-width: 1.5px;
+  --hazard: 4px;
+  --shadow: 3px 3px 0 var(--fg);
+  --icon-radius: 24%;
+  --display: system-ui, "Noto Sans JP", sans-serif;
+  --mono: system-ui, "Noto Sans JP", sans-serif;
+  color-scheme: light;
+}
+[data-theta-skin="alert"] {
+  --bg: #050404;
+  --panel: #0D0908;
+  --raised: #1A110C;
+  --fg: #FFD9B0;
+  --muted: #D6955C;
+  --faint: #9C6A42;
+  --line: #5C3418;
+  --accent: #FF7A00;
+  --on-accent: #050404;
+  --widget: #FF2A2A;
+  --launch: #39E07A;
+  --zebra: rgba(255,122,0,0.078);
+  --accent2: #FF2A2A;
+  --accent3: #39E07A;
+  --radius: 0px;
+  --line-width: 1px;
+  --hazard: 10px;
+  --shadow: none;
+  --icon-radius: 0;
+  --display: "Oswald", "Noto Sans JP", sans-serif;
+  --mono: "Share Tech Mono", ui-monospace, "Noto Sans JP", monospace;
+  color-scheme: dark;
+}
+[data-theta-skin="scifi"] {
+  --bg: #060C0E;
+  --panel: #0B1519;
+  --raised: #112128;
+  --fg: #DDF6FF;
+  --muted: #8FB8C4;
+  --faint: #5F8794;
+  --line: #1F3C46;
+  --accent: #F2E21B;
+  --on-accent: #060C0E;
+  --widget: #3FD0E8;
+  --launch: #7BE38B;
+  --zebra: rgba(63,208,232,0.071);
+  --accent2: #3FD0E8;
+  --accent3: #7BE38B;
+  --radius: 0px;
+  --line-width: 1px;
+  --hazard: 6px;
+  --shadow: none;
+  --icon-radius: 0;
+  --display: "Oswald", "Noto Sans JP", sans-serif;
+  --mono: "Share Tech Mono", ui-monospace, "Noto Sans JP", monospace;
+  color-scheme: dark;
+}
+[data-theta-skin="term"] {
+  --bg: #030805;
+  --panel: #06100A;
+  --raised: #0B1E12;
+  --fg: #8CFFB0;
+  --muted: #4FC97A;
+  --faint: #358A55;
+  --line: #1D5531;
+  --accent: #3DFF7F;
+  --on-accent: #031006;
+  --widget: #C9FFD9;
+  --launch: #2E9E58;
+  --zebra: rgba(61,255,127,0.078);
+  --accent2: #C9FFD9;
+  --accent3: #2E9E58;
+  --radius: 8px;
+  --line-width: 1px;
+  --hazard: 0px;
+  --shadow: none;
+  --icon-radius: 0;
+  --display: "Share Tech Mono", ui-monospace, "Noto Sans JP", monospace;
+  --mono: "Share Tech Mono", ui-monospace, "Noto Sans JP", monospace;
+  color-scheme: dark;
+}
+[data-theta-skin="braun"] {
+  --bg: #E9E7E1;
+  --panel: #F6F5F1;
+  --raised: #DDDAD2;
+  --fg: #2A2A2A;
+  --muted: #575757;
+  --faint: #6E6B64;
+  --line: #BFBBB1;
+  --accent: #E8711A;
+  --on-accent: #FFFFFF;
+  --widget: #5E7A68;
+  --launch: #3A3A3A;
+  --zebra: rgba(0,0,0,0.039);
+  --accent2: #5E7A68;
+  --accent3: #C9C5BA;
+  --radius: 14px;
+  --line-width: 1.5px;
+  --hazard: 4px;
+  --shadow: 0 6px 16px rgba(0,0,0,.18);
+  --icon-radius: 50%;
+  --display: system-ui, "Noto Sans JP", sans-serif;
+  --mono: system-ui, "Noto Sans JP", sans-serif;
+  color-scheme: light;
+}
+[data-theta-skin="soft"] {
+  --bg: #ECEDF0;
+  --panel: #F3F4F7;
+  --raised: #E3E5EA;
+  --fg: #262A33;
+  --muted: #545B68;
+  --faint: #6B7280;
+  --line: #D9DCE2;
+  --accent: #F0A23A;
+  --on-accent: #262A33;
+  --widget: #5FA8DC;
+  --launch: #7FC08E;
+  --zebra: rgba(0,0,0,0.031);
+  --accent2: #E8606F;
+  --accent3: #7FC08E;
+  --radius: 18px;
+  --line-width: 1.5px;
+  --hazard: 4px;
+  --shadow: 0 6px 16px rgba(0,0,0,.18);
+  --icon-radius: 24%;
+  --display: system-ui, "Noto Sans JP", sans-serif;
+  --mono: system-ui, "Noto Sans JP", sans-serif;
+  color-scheme: light;
+}
+[data-theta-skin="window"] {
+  --bg: #52C3D6;
+  --panel: #FFF8EA;
+  --raised: #FBEBCF;
+  --fg: #3B2C27;
+  --muted: #5E4C44;
+  --faint: #7D6A60;
+  --line: #3B2C27;
+  --accent: #F5A33A;
+  --on-accent: #3B2C27;
+  --widget: #7C8DF2;
+  --launch: #F28DB2;
+  --zebra: rgba(245,163,58,0.078);
+  --accent2: #7C8DF2;
+  --accent3: #F28DB2;
+  --radius: 6px;
+  --line-width: 1.5px;
+  --hazard: 4px;
+  --shadow: 3px 3px 0 var(--fg);
+  --icon-radius: 24%;
+  --display: system-ui, "Noto Sans JP", sans-serif;
+  --mono: system-ui, "Noto Sans JP", sans-serif;
+  color-scheme: light;
+}
+[data-theta-skin="lcd"] {
+  --bg: #8E9B69;
+  --panel: #99A673;
+  --raised: #A6B27F;
+  --fg: #1C2610;
+  --muted: #2F3D1C;
+  --faint: #45542C;
+  --line: #1C2610;
+  --accent: #1C2610;
+  --on-accent: #A6B27F;
+  --widget: #3C5568;
+  --launch: #6B4A33;
+  --zebra: rgba(28,38,16,0.063);
+  --accent2: #3C5568;
+  --accent3: #6B4A33;
+  --radius: 8px;
+  --line-width: 1px;
+  --hazard: 0px;
+  --shadow: none;
+  --icon-radius: 0;
+  --display: "Share Tech Mono", ui-monospace, "Noto Sans JP", monospace;
+  --mono: "Share Tech Mono", ui-monospace, "Noto Sans JP", monospace;
+  color-scheme: light;
+}
+
+/* 背景の模様。地を塗る要素に .theta-backdrop を付ける */
+[data-theta-skin="alert"] .theta-backdrop, .theta-backdrop[data-theta-skin="alert"] {
+  background-image: repeating-linear-gradient(to bottom, color-mix(in srgb, var(--accent) 5%, transparent) 0 1px, transparent 1px 4px);
+}
+[data-theta-skin="scifi"] .theta-backdrop, .theta-backdrop[data-theta-skin="scifi"] {
+  background-image: repeating-linear-gradient(to right, color-mix(in srgb, var(--widget) 7%, transparent) 0 1px, transparent 1px 28px),
+    repeating-linear-gradient(to bottom, color-mix(in srgb, var(--widget) 7%, transparent) 0 1px, transparent 1px 28px);
+}
+[data-theta-skin="term"] .theta-backdrop, .theta-backdrop[data-theta-skin="term"] {
+  background-image: repeating-linear-gradient(to right, color-mix(in srgb, var(--accent) 10%, transparent) 0 2px, transparent 2px 18px);
+}
+[data-theta-skin="window"] .theta-backdrop, .theta-backdrop[data-theta-skin="window"] {
+  background-image: repeating-linear-gradient(to right, rgba(255,255,255,.22) 0 1px, transparent 1px 36px),
+    repeating-linear-gradient(to bottom, rgba(255,255,255,.22) 0 1px, transparent 1px 36px);
+}
+[data-theta-skin="lcd"] .theta-backdrop, .theta-backdrop[data-theta-skin="lcd"] {
+  background-image: repeating-linear-gradient(to bottom, color-mix(in srgb, var(--fg) 3.5%, transparent) 0 1px, transparent 1px 3px);
+}
+/* ボタン・台の影（POP・WINDOW は右下にずらした影、BRAUN・SOFT は浮き出し） */
+.theta-pop-shadow { box-shadow: var(--shadow); }

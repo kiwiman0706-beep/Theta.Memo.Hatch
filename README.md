@@ -1,6 +1,6 @@
 # Theta Memo Hatch
 
-Google Keep のような付箋の壁のメモアプリ。ただしデータは **Obsidian 形式のファイル（Theta Vault）** で Google ドライブに置くので、PC・Mac・他のアプリからも読み書きでき、リッチテキスト・表・あらゆるファイルの添付ができます。Theta Hatch シリーズ（[Theta Meishi Hatch](https://github.com/kiwiman0706-beep/MeishiApp) と同じ Vault・同じ約束ごと）。
+Google Keep のような付箋の壁のメモアプリ。ただしデータは **Obsidian 形式のファイル（Theta Vault）** で Google ドライブに置くので、PC・Mac・他のアプリからも読み書きでき、リッチテキスト・表・あらゆるファイルの添付ができます。Theta Hatch シリーズ（共通の決まりは [Theta.Hatch.Series](https://github.com/kiwiman0706-beep/Theta.Hatch.Series)）。データは Synology の NAS（Tailscale 経由、正本）と Google ドライブの両方、またはどちらかに置けます。
 
 | Keep のよいところ（そのまま） | Keep に足りなかったもの（追加） |
 | --- | --- |
@@ -8,7 +8,7 @@ Google Keep のような付箋の壁のメモアプリ。ただしデータは *
 | テキスト・チェックリスト | リッチテキスト（見出し・太字・ハイライト…）・表 |
 | 手書き（Sペン対応） | 写真・PDF・動画・あらゆるファイルを添付し、一覧にサムネイル |
 | 音声メモ（音声認識つき、音声ファイルも残す） | ブラウザからのスクラップ（Android の共有、PC・Mac は Obsidian Web Clipper） |
-| ウィジェット（1つのメモ・メモ一覧） | PC・Mac・Android で同期（Google ドライブ） |
+| ウィジェット（1つのメモ・メモ一覧） | PC・Mac・Android で同期（NAS を正本に、Google ドライブにも） |
 | | Google Keep から Takeout で取り込み |
 | | GTD（受信箱・整理・次にやる・待ち・予定・プロジェクト・週次レビュー）とアイゼンハワーマトリクス |
 | | 入れ子（子メモ・アウトライン）とマインドマップ（[docs/GTD.md](docs/GTD.md)） |
@@ -16,7 +16,7 @@ Google Keep のような付箋の壁のメモアプリ。ただしデータは *
 ## 使い始める
 
 1. APK を入れる（[Releases](https://github.com/kiwiman0706-beep/Theta.Memo.Hatch/releases)）。
-2. 同期：メニュー →「Google Driveと同期を始める」。最初に Google Cloud で **Android 用 OAuth クライアントを1つ追加**します（Meishi と同じプロジェクト。パッケージ名とSHA-1はアプリの「初期設定ガイド」でコピーできます）。
+2. 同期：設定 →「NAS を設定する」（接続先・アカウント・Theta Vault を置くフォルダ。Theta Home Hatch があればその設定を使えます）と、「Google ドライブ：同期を始める」。
 3. Keep のメモ：メニュー →「Google Keepから取り込む」（Takeout の ZIP を選ぶ）。
 4. PC・Mac：Google ドライブ for デスクトップ＋Obsidian で `Theta Vault` を開く。ブラウザのスクラップは Obsidian Web Clipper の保存先を `Memo/Clippings` に（[docs/INTEGRATION.md](docs/INTEGRATION.md)）。
 
@@ -30,6 +30,7 @@ Google Keep のような付箋の壁のメモアプリ。ただしデータは *
 | `docs/INTEGRATION.md` | Obsidian・Web Clipper・Home Hatch・DeskHatch との連携 |
 | `docs/TESTING.md` | 自動テストと、実機で未確認のこと |
 | `docs/RELEASING.md` | リリースの手順（シリーズ共通の署名鍵） |
+| `CLAUDE.md` | 開発の決まり（Theta.Hatch.Series を参照） |
 
 ## ビルド
 
