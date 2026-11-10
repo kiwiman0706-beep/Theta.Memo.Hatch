@@ -1,12 +1,14 @@
-# Run by hand (Actions → Release → Run workflow) or push a tag v0.1.0 → tests, then the APK signed
-# with the Theta Hatch series key, published as a GitHub Release (the app checks it for updates).
-# Needs the series Secrets ANDROID_KEYSTORE_B64, ANDROID_KEYSTORE_PASSWORD, ANDROID_KEY_ALIAS and
-# ANDROID_KEY_PASSWORD (Theta.Hatch.Series secrets/README.md). One APK per release: ThetaMemoHatch-<version>.apk.
+# Release (Theta.Hatch.Series spec §6.1): pushing a new version to main makes the tag v<version> and
+# the GitHub Release by itself; it can also be run by hand (Actions → Release → Run workflow).
+# Tests first, then the APK signed with the series key (the 4 Secrets ANDROID_KEYSTORE_B64,
+# ANDROID_KEYSTORE_PASSWORD, ANDROID_KEY_ALIAS, ANDROID_KEY_PASSWORD; secrets/README.md), checked for
+# the package name, version and signing certificate the update hubs require. One APK per release:
+# ThetaMemoHatch-<version>.apk, with SHA256SUMS-<version>.txt. Notes: docs/releases/v<version>.md.
 name: Release
 
 on:
   push:
-    tags: ["v*"]
+    branches: [main]
   workflow_dispatch:
 
 permissions:
@@ -19,20 +21,33 @@ concurrency:
 jobs:
   release:
     runs-on: ubuntu-24.04 # Playwright does not run on 26.04 yet
+    env:
+      PACKAGE: app.thetahatch.memo
+      CERT_SHA256: f47740d8549bc1c37feb00b18780d80b52758b60252ba0d2217d83ab3f012a23
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-java@v4
-        with: { distribution: temurin, java-version: "17" }
-      - uses: actions/setup-node@v4
-        with: { node-version: "20" }
       - id: v
-        name: Version and release notes
+        name: Version, notes, and whether this version is already released
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           version="$(sed -n "s/.*versionName '\(.*\)'.*/\1/p" android/app/build.gradle)"
-          if [ "$GITHUB_REF_TYPE" = tag ]; then test "${GITHUB_REF_NAME#v}" = "$version"; fi
-          test -f "docs/releases/v$version.md"
+          test -n "$version"
           echo "version=$version" >> "$GITHUB_OUTPUT"
-      - name: Tests
+          if gh release view "v$version" > /dev/null 2>&1; then
+            # A push that does not raise the version: nothing to publish. By hand: the APK is replaced.
+            if [ "$GITHUB_EVENT_NAME" = push ]; then echo "skip=true" >> "$GITHUB_OUTPUT"; echo "v$version is already released"; exit 0; fi
+          fi
+          test -f "docs/releases/v$version.md" || { echo "::error::docs/releases/v$version.md がありません"; exit 1; }
+          echo "skip=false" >> "$GITHUB_OUTPUT"
+      - if: steps.v.outputs.skip == 'false'
+        uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: "17" }
+      - if: steps.v.outputs.skip == 'false'
+        uses: actions/setup-node@v4
+        with: { node-version: "20" }
+      - if: steps.v.outputs.skip == 'false'
+        name: Tests
         run: |
           yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-35" "build-tools;35.0.0" > /dev/null
           (cd android && ./gradlew testDebugUnitTest --no-daemon)
@@ -40,7 +55,8 @@ jobs:
           npx playwright install --with-deps chromium
           node android/tests/md.test.cjs
           NODE_PATH="$(npm root -g)" node android/tests/ui.test.cjs
-      - name: Signed APK
+      - if: steps.v.outputs.skip == 'false'
+        name: Signed APK
         env:
           KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_B64 }}
           ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
@@ -48,23 +64,36 @@ jobs:
           ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: |
           if [ -z "$KEYSTORE_B64" ] || [ -z "$ANDROID_KEYSTORE_PASSWORD" ] || [ -z "$ANDROID_KEY_ALIAS" ]; then
-            echo "::error::Set the series Secrets ANDROID_KEYSTORE_B64, ANDROID_KEYSTORE_PASSWORD, ANDROID_KEY_ALIAS, ANDROID_KEY_PASSWORD (Theta.Hatch.Series tools/sync-secrets)"
+            echo "::error::シリーズの Secret（ANDROID_KEYSTORE_B64・ANDROID_KEYSTORE_PASSWORD・ANDROID_KEY_ALIAS・ANDROID_KEY_PASSWORD）がありません。Theta.Hatch.Series の tools/sync-secrets で配ってください"
             exit 1
           fi
           mkdir -p "$RUNNER_TEMP/signing"
           echo "$KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/signing/release.jks"
           SIGNING_FILE="$RUNNER_TEMP/signing/release.jks" android/build.sh
           rm -rf "$RUNNER_TEMP/signing"
-      - name: Publish
+      - if: steps.v.outputs.skip == 'false'
+        id: apk
+        name: What the update hubs check (package name, version, series key)
+        run: |
+          ver="${{ steps.v.outputs.version }}"
+          apk="android/build/ThetaMemoHatch-$ver.apk"
+          bt="$ANDROID_HOME/build-tools/35.0.0"
+          "$bt/aapt2" dump badging "$apk" | grep -q "package: name='$PACKAGE'" || { echo "::error::アプリ ID が $PACKAGE ではありません"; exit 1; }
+          "$bt/aapt2" dump badging "$apk" | grep -q "versionName='$ver'" || { echo "::error::APK の版が $ver ではありません"; exit 1; }
+          "$bt/apksigner" verify --print-certs "$apk" | grep -qi "SHA-256 digest: $CERT_SHA256" || { echo "::error::シリーズ共通の鍵で署名されていません"; exit 1; }
+          (cd android/build && sha256sum "ThetaMemoHatch-$ver.apk" > "SHA256SUMS-$ver.txt" && cat "SHA256SUMS-$ver.txt")
+      - if: steps.v.outputs.skip == 'false'
+        name: Publish
         env:
           GH_TOKEN: ${{ github.token }}
-          TAG: v${{ steps.v.outputs.version }}
         run: |
-          if gh release view "$TAG" > /dev/null 2>&1; then
-            gh release upload "$TAG" android/build/ThetaMemoHatch-*.apk --clobber
+          ver="${{ steps.v.outputs.version }}"
+          files="android/build/ThetaMemoHatch-$ver.apk android/build/SHA256SUMS-$ver.txt"
+          if gh release view "v$ver" > /dev/null 2>&1; then
+            gh release upload "v$ver" $files --clobber
           else
-            gh release create "$TAG" android/build/ThetaMemoHatch-*.apk \
-              --target "$GITHUB_SHA" \
-              --title "Theta Memo Hatch ${{ steps.v.outputs.version }}" \
-              --notes-file "docs/releases/$TAG.md"
+            # A version with "-" (1.0.0-beta) is a pre-release, which the hubs do not install.
+            pre=""
+            case "$ver" in *-*) pre="--prerelease";; esac
+            gh release create "v$ver" $files --target "$GITHUB_SHA" --title "Theta Memo Hatch $ver" --notes-file "docs/releases/v$ver.md" $pre
           fi
