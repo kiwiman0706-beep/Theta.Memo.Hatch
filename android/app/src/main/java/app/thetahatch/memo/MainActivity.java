@@ -304,6 +304,7 @@ public class MainActivity extends Activity {
           .put("transcribe", prefs().getString("transcribe", "auto"))
           .put("deviceRecognizer", Build.VERSION.SDK_INT >= 33 && android.speech.SpeechRecognizer.isOnDeviceRecognitionAvailable(this))
           .put("shareOpen", prefs().getBoolean("shareOpen", false))
+          .put("shelfPinned", prefs().getBoolean("shelfPinned", true))
           .put("layout", prefs().getString("layout", "grid"))
           .put("skin", prefs().getString("skin", "system"))
           .put("syncEnabled", prefs().getBoolean("syncEnabled", false))
@@ -790,9 +791,11 @@ public class MainActivity extends Activity {
           if (q.has("skin") && Series.SKINS.contains(q.getString("skin"))) e.putString("skin", q.getString("skin"));
           if (q.has("transcribe")) e.putString("transcribe", q.getString("transcribe"));
           if (q.has("shareOpen")) e.putBoolean("shareOpen", q.getBoolean("shareOpen"));
+          if (q.has("shelfPinned")) e.putBoolean("shelfPinned", q.getBoolean("shelfPinned"));
           if (q.has("layout")) e.putString("layout", q.getString("layout"));
           e.apply();
           if (q.has("skin")) Series.changed(this, "ui.skin");
+          if (q.has("shelfPinned")) getContentResolver().notifyChange(SeriesProvider.shelfUri(this), null);
           if (q.has("model")) Series.changed(this, "gemini.model");
           refresh();
           return;

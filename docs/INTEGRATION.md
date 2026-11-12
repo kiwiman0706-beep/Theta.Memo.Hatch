@@ -19,6 +19,7 @@ Keepに無い「他のアプリとの連携」は、**データがObsidian形式
 | メモを開く | `Intent(MainActivity)`、extra `open` = id（パッケージ `app.thetahatch.memo`） |
 | 新しいメモ | action `app.thetahatch.memo.NEW`、extra `type` = `text` / `list` / `ink` / `audio` / `photo` / `file`、任意で `android.intent.extra.TEXT` |
 | シリーズの発見 | action `app.thetahatch.HATCH` |
+| 棚（Home の「MemoHatch」タブ） | `content://app.thetahatch.memo.theta/shelf` を query（シリーズ spec `THETA_SHARED_SETTINGS.md` §4.2）。ピン留めのメモを 1 行 1 つ：`section`=`pinned`、`sectionTitle`=`ピン留め`、`id`、`title`、`subtitle`（空）、`text`（本文の頭、200 字まで）、`image`（写真・手書きのあるメモは `content://app.thetahatch.memo.theta/image/<name>`、サムネイルの JPEG）、`action`（そのメモを開く Intent の `toUri(URI_INTENT_SCHEME)`）、`color`（`#RRGGBB`、色なしは空）。最大 30 件。メモが変わると約 2 秒後に `notifyChange`。設定で出さないようにできる |
 | 画像のサムネイル | Vaultの `Memo/_files/<cover>` を読む（Home Hatch が Vault に対応したとき） |
 
 Home Hatch の「記録」ドロワー（録音・Sペン）から `NEW` を呼ぶと、記録をそのままメモにできます。

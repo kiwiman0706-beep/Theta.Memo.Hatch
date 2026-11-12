@@ -14,12 +14,72 @@ import java.util.*;
 // user chose to use it (docs/THETA_SHARED_SETTINGS.md §4). Readable only by apps signed with the
 // same key (permission app.thetahatch.permission.SHARE, protectionLevel signature); every read is
 // told to the user. /notes lists the notes for Theta Home Hatch (docs/INTEGRATION.md). /info says whether there is a key to lend, without revealing it.
+// /shelf is this app's shelf for Home (Theta.Hatch.Series spec/THETA_SHARED_SETTINGS.md §4.2): the
+// pinned notes, with their pictures served by openFile at /image/<name>.
 public class SeriesProvider extends ContentProvider {
   public static final String ACTION = "app.thetahatch.HATCH";
 
+  static final String SHELF_LIMIT = "30";
+  final android.os.Handler main = new android.os.Handler(android.os.Looper.getMainLooper());
+  final Runnable shelfChanged = () -> {
+    Context c = getContext();
+    if (c != null) c.getContentResolver().notifyChange(shelfUri(c), null);
+  };
+
+  static Uri shelfUri(Context c) {
+    return Uri.parse("content://" + c.getPackageName() + ".theta/shelf");
+  }
+
   @Override
   public boolean onCreate() {
+    // Notes changed (typing, sync, widgets): Home reads the shelf again, at most every couple of seconds.
+    Store.listener = () -> {
+      main.removeCallbacks(shelfChanged);
+      main.postDelayed(shelfChanged, 2000);
+    };
     return true;
+  }
+
+  // Pinned notes shown on Home's shelf; the user can turn this off in the settings.
+  static List<org.json.JSONObject> shelf(Context c) throws Exception {
+    List<org.json.JSONObject> out = new ArrayList<>();
+    if (!c.getSharedPreferences("prefs", 0).getBoolean("shelfPinned", true)) return out;
+    for (org.json.JSONObject n : Notes.active(Store.get(c).all())) {
+      if (!n.optBoolean("pinned")) break; // active() lists pinned notes first
+      out.add(n);
+      if (out.size() >= Integer.parseInt(SHELF_LIMIT)) break;
+    }
+    return out;
+  }
+
+  // The note's first picture (photo or handwriting), for the shelf.
+  static String picture(org.json.JSONObject n) {
+    for (String m : NoteCodec.media(n.optString("body")))
+      if (m.matches("(?i).*\\.(jpe?g|png|gif|webp|heic|heif)$")) return m;
+    return null;
+  }
+
+  static String text(org.json.JSONObject n) throws Exception {
+    StringBuilder b = new StringBuilder();
+    String title = Notes.title(n);
+    boolean skipTitle = n.optString("title").trim().isEmpty();
+    for (org.json.JSONObject l : Notes.lines(n, 6)) {
+      if (skipTitle && l.optString("text").equals(title)) {
+        skipTitle = false;
+        continue;
+      }
+      if (b.length() > 0) b.append('\n');
+      if (l.optString("type").equals("check")) b.append(l.optBoolean("checked") ? "☑ " : "☐ ");
+      b.append(l.optString("text"));
+      if (b.length() > 200) break;
+    }
+    return b.length() > 200 ? b.substring(0, 200) + "…" : b.toString();
+  }
+
+  static String color(org.json.JSONObject n) {
+    String key = n.optString("color");
+    Integer c = key.isEmpty() ? null : Notes.COLOR.get(key);
+    return c == null ? "" : String.format("#%06X", c & 0xFFFFFF);
   }
 
   @Override
@@ -42,6 +102,22 @@ public class SeriesProvider extends ContentProvider {
           String cover = Notes.cover(n);
           m.addRow(new Object[] {n.optString("id"), Notes.title(n), b.toString(), n.optString("color"), n.optBoolean("pinned") ? 1 : 0, n.optLong("updated"), cover == null ? "" : cover});
         }
+        return m;
+      }
+      if ("/shelf".equals(uri.getPath())) {
+        MatrixCursor m = new MatrixCursor(new String[] {"section", "sectionTitle", "id", "title", "subtitle", "text", "image", "action", "color"});
+        for (org.json.JSONObject n : shelf(c)) {
+          String id = n.getString("id");
+          // Opens this note in this app (Home re-targets it to this package before opening).
+          String action = new Intent(c, MainActivity.class).setAction(Intent.ACTION_VIEW)
+              .setData(Uri.parse("memo-note://" + id)).putExtra(Widgets.EXTRA_OPEN, id)
+              .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK).toUri(Intent.URI_INTENT_SCHEME);
+          String pic = picture(n);
+          String image = pic == null || Thumbs.get(Store.get(c), pic) == null ? "" : "content://" + c.getPackageName() + ".theta/image/" + pic;
+          String title = Notes.title(n);
+          m.addRow(new Object[] {"pinned", "ピン留め", id, title.isEmpty() ? "メモ" : title, "", text(n), image, action, color(n)});
+        }
+        m.setNotificationUri(c.getContentResolver(), shelfUri(c));
         return m;
       }
       String key = VaultKey.get(c);
@@ -109,7 +185,24 @@ public class SeriesProvider extends ContentProvider {
 
   @Override
   public String getType(Uri uri) {
-    return null;
+    return uri.getPath() != null && uri.getPath().startsWith("/image/") ? "image/jpeg" : null;
+  }
+
+  // Shelf pictures: a thumbnail of a picture that a note on the shelf shows, nothing else.
+  @Override
+  public android.os.ParcelFileDescriptor openFile(Uri uri, String mode) throws java.io.FileNotFoundException {
+    String path = uri.getPath();
+    if (path == null || !path.startsWith("/image/") || !"r".equals(mode)) throw new java.io.FileNotFoundException();
+    String name = path.substring(7);
+    try {
+      for (org.json.JSONObject n : shelf(getContext()))
+        if (name.equals(picture(n))) {
+          java.io.File t = Thumbs.get(Store.get(getContext()), name);
+          if (t != null) return android.os.ParcelFileDescriptor.open(t, android.os.ParcelFileDescriptor.MODE_READ_ONLY);
+        }
+    } catch (Exception ignored) {
+    }
+    throw new java.io.FileNotFoundException(name);
   }
 
   @Override

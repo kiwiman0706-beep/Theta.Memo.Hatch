@@ -888,6 +888,14 @@
     so.appendChild(cb);
     so.appendChild(el('span', '', '「共有」で保存したあと、そのメモを開く'));
     body.appendChild(so);
+    var sh = el('label', 'check-row');
+    var shb = el('input');
+    shb.type = 'checkbox';
+    shb.checked = st.shelfPinned !== false;
+    shb.onchange = function () { App.native('settings', { shelfPinned: shb.checked }); };
+    sh.appendChild(shb);
+    sh.appendChild(el('span', '', 'ピン留めしたメモを Theta Home Hatch の「MemoHatch」タブ（棚）に並べる'));
+    body.appendChild(sh);
 
     body.appendChild(el('h3', '', 'このアプリ'));
     body.appendChild(el('p', 'muted', 'Theta Memo Hatch ' + (st.version || '') + '　データの形式：Theta Vault（Obsidian形式）'));
