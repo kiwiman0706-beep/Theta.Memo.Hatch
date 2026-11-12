@@ -465,7 +465,8 @@
     }
 
     function fileBlock(d, b, i) {
-      var src = 'media/' + b.name;
+      // HEIC (Camera Hatch) is shown through its JPEG thumbnail; the WebView may not draw HEIC.
+      var src = (/\.(heic|heif)$/i.test(b.name) ? 'thumb/' : 'media/') + b.name;
       var menuBtn = el('button', 'blk-menu', '⋯');
       menuBtn.title = 'メニュー';
       menuBtn.onclick = function (e) { e.stopPropagation(); fileMenu(menuBtn, b, i); };
@@ -545,7 +546,7 @@
     function viewer(b) {
       var v = el('div', 'viewer');
       var img = el('img');
-      img.src = 'media/' + b.name;
+      img.src = (/\.(heic|heif)$/i.test(b.name) ? 'thumb/' : 'media/') + b.name;
       v.appendChild(img);
       var bar = el('div', 'viewer-bar');
       var x = el('button', 'icon', '✕');

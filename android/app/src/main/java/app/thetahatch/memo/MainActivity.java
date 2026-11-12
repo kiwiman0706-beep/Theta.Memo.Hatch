@@ -26,8 +26,9 @@ import org.json.*;
 // here → UI: window.onNative({type, data}) — the Theta Hatch series bridge.
 public class MainActivity extends Activity {
   static final String HOST = "memo.theta.local";
-  static final int PICK_FILES = 11, CAMERA = 12, IMPORT_KEEP = 13, DRIVE_AUTH = 14, SCAN_DOC = 15, PERMS = 44;
+  static final int PICK_FILES = 11, CAMERA = 12, IMPORT_KEEP = 13, DRIVE_AUTH = 14, SCAN_DOC = 15, CAPTURE = 16, PERMS = 44;
   static final String CAMERA_HATCH = "app.thetahatch.camera", ACTION_SCAN = "app.thetahatch.action.SCAN";
+  static final String ACTION_CAPTURE = "app.thetahatch.action.CAPTURE";
   // Opened by another series app's "scan" button (spec §6.2 SCAN): back to it when the note is closed.
   boolean scanCaller = false;
   static volatile MainActivity instance;
@@ -586,6 +587,7 @@ public class MainActivity extends Activity {
             PICK_FILES);
         return;
       case "camera":
+        if (capture(q, "photo")) return;
         {
           String name = Store.newName(".jpg");
           File f = store.mediaFile(name);
@@ -594,9 +596,6 @@ public class MainActivity extends Activity {
           Intent i = new Intent(MediaStore.ACTION_IMAGE_CAPTURE).putExtra(MediaStore.EXTRA_OUTPUT, u)
               .addFlags(Intent.FLAG_GRANT_WRITE_URI_PERMISSION | Intent.FLAG_GRANT_READ_URI_PERMISSION);
           i.setClipData(ClipData.newRawUri("photo", u));
-          // Theta Camera Hatch, when it can hand a photo back (ACTION_IMAGE_CAPTURE); else the phone's camera.
-          Intent hatch = new Intent(i).setPackage(CAMERA_HATCH);
-          if (hatch.resolveActivity(getPackageManager()) != null) i = hatch;
           try {
             startActivityForResult(i, CAMERA);
           } catch (ActivityNotFoundException e) {
@@ -605,7 +604,7 @@ public class MainActivity extends Activity {
           return;
         }
       case "scan":
-        scan(q);
+        if (!capture(q, "scan")) scan(q);
         return;
       case "saveInk":
         {
@@ -890,6 +889,56 @@ public class MainActivity extends Activity {
     }
   }
 
+  // Theta Camera Hatch, when installed (spec §6.2 CAPTURE): photos, videos and scans in one camera
+  // screen, any number, handed back to this note. Without it, the phone's camera / Google's scanner.
+  Intent captureIntent() {
+    Intent i = new Intent(ACTION_CAPTURE).setPackage(CAMERA_HATCH);
+    return i.resolveActivity(getPackageManager()) != null ? i : null;
+  }
+
+  boolean capture(JSONObject q, String mode) throws Exception {
+    Intent i = captureIntent();
+    if (i == null) return false;
+    pending = new JSONObject().put("note", q.getString("note")).put("req", q.optString("req"));
+    i.putExtra("source", "memo")
+        .putExtra("mode", mode)
+        .putExtra("modes", new String[] {"photo", "video", "scan"})
+        .putExtra("multiple", true)
+        .putExtra("scanFormat", "images".equals(prefs().getString("scanPages", "pdf")) ? "images" : "pdf");
+    try {
+      startActivityForResult(i, CAPTURE);
+      return true;
+    } catch (Exception e) {
+      return false; // e.g. an older Camera Hatch, or this app not signed with the series key
+    }
+  }
+
+  // What Camera Hatch handed back: copied at once (its files go after 30 minutes).
+  void captured(Intent data) throws Exception {
+    final List<Uri> uris = new ArrayList<>();
+    if (data != null && data.getClipData() != null)
+      for (int k = 0; k < data.getClipData().getItemCount(); k++) {
+        Uri u = data.getClipData().getItemAt(k).getUri();
+        if (u != null) uris.add(u);
+      }
+    if (uris.isEmpty() && data != null && data.getData() != null) uris.add(data.getData());
+    if (uris.isEmpty()) throw new IOException("Camera Hatch から受け取れるものがありませんでした");
+    final JSONObject p = pending;
+    task("撮ったものを取り込み中", () -> {
+      JSONArray files = new JSONArray();
+      String stamp = new java.text.SimpleDateFormat("yyyy-MM-dd HHmm", Locale.JAPAN).format(new Date());
+      for (Uri u : uris) {
+        JSONObject f = ShareActivity.importFile(this, u);
+        String name = f.getString("name");
+        // Pictures and videos show as themselves; a scanned PDF gets a readable name.
+        if (name.endsWith(".pdf")) f.put("label", "スキャン " + stamp + ".pdf");
+        else f.put("label", "");
+        files.put(f);
+      }
+      event("attached", new JSONObject().put("note", p.getString("note")).put("req", p.optString("req")).put("files", files));
+    });
+  }
+
   // Scan mode (as in Meishi / Chirashi): Google's document scanner finds the edges, straightens and
   // cleans up the page; several pages can be taken. One page becomes a picture in the note, more
   // pages one PDF (with the pages also as pictures when asked).
@@ -997,6 +1046,10 @@ public class MainActivity extends Activity {
       }
       if (result != RESULT_OK) {
         if (request == CAMERA) store.mediaFile(pending.optString("name")).delete();
+        return;
+      }
+      if (request == CAPTURE) {
+        captured(data);
         return;
       }
       if (request == SCAN_DOC) {
