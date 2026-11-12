@@ -62,6 +62,7 @@ const MOCK = `
     if (q.action === 'record') send('recording', { note: q.note, start: Date.now() });
     if (q.action === 'stopRecord') { var n = window.__calls.filter(function (c) { return c.action === 'record'; }).pop().note; send('recorded', { note: n, name: 'rec2.m4a', duration: 3000 });
       setTimeout(function () { window.onNative({ type: 'transcript', data: { note: n, name: 'rec2.m4a', text: '書き起こしのテスト' } }); }, 30); }
+    if (q.action === 'scan') send('attached', { note: q.note, files: [{ name: 'scan1.pdf', label: 'スキャン 2026-11-12 1000（3ページ）.pdf', mime: 'application/pdf' }] });
     if (q.action === 'nasSave') send('nasStatus', { state: 'otp', message: '2 段階認証のコードを入れてください' });
     if (q.action === 'nasOtp') send('nasStatus', { state: q.code === '123456' ? 'ok' : 'error', message: 'x' });
     if (q.action === 'saveInk') send('inkSaved', { note: q.note, req: q.req, name: 'ink1.ink.png' });
@@ -285,6 +286,23 @@ const MOCK = `
     await g.click('.mm-bar .icon >> nth=0');
     assert.ok(await g.locator('.editor .rt', { hasText: '数値目標' }).count(), 'editor shows the new branch');
     await g.context().close();
+    passed++;
+  }
+
+  // Scan mode and a note placed on the home screen
+  {
+    const c = await page(390, 844);
+    await c.click('#new-image');
+    await c.click('.menu button:has-text("スキャン")');
+    await c.waitForSelector('.blk-file.k-pdf');
+    await c.waitForTimeout(900);
+    const sv = (await saves(c)).pop();
+    assert.ok(sv.body.includes('![[Memo/_files/scan1.pdf|スキャン 2026-11-12 1000（3ページ）.pdf]]'), sv.body);
+    await c.click('.ed-foot .icon[title="その他"]');
+    await c.click('.menu button:has-text("ホーム画面に置く")');
+    const pin = await c.evaluate(() => window.__calls.filter(x => x.action === 'pinWidget').pop());
+    assert.strictEqual(pin.note, sv.id);
+    await c.context().close();
     passed++;
   }
 

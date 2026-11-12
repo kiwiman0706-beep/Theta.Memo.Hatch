@@ -26,7 +26,10 @@ import org.json.*;
 // here → UI: window.onNative({type, data}) — the Theta Hatch series bridge.
 public class MainActivity extends Activity {
   static final String HOST = "memo.theta.local";
-  static final int PICK_FILES = 11, CAMERA = 12, IMPORT_KEEP = 13, DRIVE_AUTH = 14, PERMS = 44;
+  static final int PICK_FILES = 11, CAMERA = 12, IMPORT_KEEP = 13, DRIVE_AUTH = 14, SCAN_DOC = 15, PERMS = 44;
+  static final String CAMERA_HATCH = "app.thetahatch.camera", ACTION_SCAN = "app.thetahatch.action.SCAN";
+  // Opened by another series app's "scan" button (spec §6.2 SCAN): back to it when the note is closed.
+  boolean scanCaller = false;
   static volatile MainActivity instance;
   public static volatile String editing = "";
   WebView web;
@@ -261,6 +264,11 @@ public class MainActivity extends Activity {
     if (i == null) return;
     String open = i.getStringExtra(Widgets.EXTRA_OPEN);
     String kind = i.getStringExtra(Widgets.EXTRA_NEW);
+    if (ACTION_SCAN.equals(i.getAction())) {
+      kind = "pick".equals(i.getStringExtra("mode")) ? "file" : "scan";
+      scanCaller = true;
+      i.setAction(null);
+    }
     if (kind == null && i.getAction() != null && i.getAction().startsWith("app.thetahatch.memo.NEW"))
       kind = i.getStringExtra("type") == null ? "text" : i.getStringExtra("type");
     if (open != null) launch = "open:" + open;
@@ -305,6 +313,7 @@ public class MainActivity extends Activity {
           .put("deviceRecognizer", Build.VERSION.SDK_INT >= 33 && android.speech.SpeechRecognizer.isOnDeviceRecognitionAvailable(this))
           .put("shareOpen", prefs().getBoolean("shareOpen", false))
           .put("shelfPinned", prefs().getBoolean("shelfPinned", true))
+          .put("scanPages", prefs().getString("scanPages", "pdf"))
           .put("layout", prefs().getString("layout", "grid"))
           .put("skin", prefs().getString("skin", "system"))
           .put("syncEnabled", prefs().getBoolean("syncEnabled", false))
@@ -534,6 +543,11 @@ public class MainActivity extends Activity {
         return;
       case "editing":
         editing = q.optString("id");
+        if (editing.isEmpty() && scanCaller) {
+          scanCaller = false;
+          setResult(RESULT_OK);
+          finish();
+        }
         return;
       case "save":
         {
@@ -580,6 +594,9 @@ public class MainActivity extends Activity {
           Intent i = new Intent(MediaStore.ACTION_IMAGE_CAPTURE).putExtra(MediaStore.EXTRA_OUTPUT, u)
               .addFlags(Intent.FLAG_GRANT_WRITE_URI_PERMISSION | Intent.FLAG_GRANT_READ_URI_PERMISSION);
           i.setClipData(ClipData.newRawUri("photo", u));
+          // Theta Camera Hatch, when it can hand a photo back (ACTION_IMAGE_CAPTURE); else the phone's camera.
+          Intent hatch = new Intent(i).setPackage(CAMERA_HATCH);
+          if (hatch.resolveActivity(getPackageManager()) != null) i = hatch;
           try {
             startActivityForResult(i, CAMERA);
           } catch (ActivityNotFoundException e) {
@@ -587,6 +604,9 @@ public class MainActivity extends Activity {
           }
           return;
         }
+      case "scan":
+        scan(q);
+        return;
       case "saveInk":
         {
           String base = Store.newName("");
@@ -792,6 +812,7 @@ public class MainActivity extends Activity {
           if (q.has("transcribe")) e.putString("transcribe", q.getString("transcribe"));
           if (q.has("shareOpen")) e.putBoolean("shareOpen", q.getBoolean("shareOpen"));
           if (q.has("shelfPinned")) e.putBoolean("shelfPinned", q.getBoolean("shelfPinned"));
+          if (q.has("scanPages")) e.putString("scanPages", "images".equals(q.getString("scanPages")) ? "images" : "pdf");
           if (q.has("layout")) e.putString("layout", q.getString("layout"));
           e.apply();
           if (q.has("skin")) Series.changed(this, "ui.skin");
@@ -822,9 +843,17 @@ public class MainActivity extends Activity {
       case "pinWidget":
         {
           AppWidgetManager m = AppWidgetManager.getInstance(this);
-          Class<?> c = q.optString("kind").equals("note") ? Widgets.NoteWidget.class : Widgets.ListWidget.class;
-          if (m.isRequestPinAppWidgetSupported()) m.requestPinAppWidget(new ComponentName(this, c), null, null);
-          else toast("ホーム画面を長押し →「ウィジェット」→「Theta Memo Hatch」から追加してください");
+          String note = q.optString("note");
+          Class<?> c = q.optString("kind").equals("note") || !note.isEmpty() ? Widgets.NoteWidget.class : Widgets.ListWidget.class;
+          if (!m.isRequestPinAppWidgetSupported()) {
+            toast("ホーム画面を長押し →「ウィジェット」→「Theta Memo Hatch」から追加してください");
+            return;
+          }
+          // A given note: Android tells Widgets.Pinned the new widget's id once it is placed.
+          PendingIntent placed = note.isEmpty() ? null
+              : PendingIntent.getBroadcast(this, note.hashCode(), new Intent(this, Widgets.Pinned.class).putExtra(Widgets.EXTRA_OPEN, note),
+                  PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_MUTABLE);
+          m.requestPinAppWidget(new ComponentName(this, c), null, placed);
           return;
         }
       case "copyText":
@@ -859,6 +888,57 @@ public class MainActivity extends Activity {
       default:
         throw new IOException("不明な操作です：" + action);
     }
+  }
+
+  // Scan mode (as in Meishi / Chirashi): Google's document scanner finds the edges, straightens and
+  // cleans up the page; several pages can be taken. One page becomes a picture in the note, more
+  // pages one PDF (with the pages also as pictures when asked).
+  void scan(JSONObject q) throws Exception {
+    pending = new JSONObject().put("note", q.getString("note")).put("req", q.optString("req"));
+    com.google.mlkit.vision.documentscanner.GmsDocumentScannerOptions options =
+        new com.google.mlkit.vision.documentscanner.GmsDocumentScannerOptions.Builder()
+            .setGalleryImportAllowed(true)
+            .setPageLimit(30)
+            .setResultFormats(com.google.mlkit.vision.documentscanner.GmsDocumentScannerOptions.RESULT_FORMAT_JPEG,
+                com.google.mlkit.vision.documentscanner.GmsDocumentScannerOptions.RESULT_FORMAT_PDF)
+            .setScannerMode(com.google.mlkit.vision.documentscanner.GmsDocumentScannerOptions.SCANNER_MODE_FULL)
+            .build();
+    toast("スキャンを準備中（初回は Google Play 開発者サービスが機能を取得します）");
+    com.google.mlkit.vision.documentscanner.GmsDocumentScanning.getClient(options).getStartScanIntent(this)
+        .addOnSuccessListener(sender -> {
+          try {
+            startIntentSenderForResult(sender, SCAN_DOC, null, 0, 0, 0);
+          } catch (Exception e) {
+            error(e);
+          }
+        })
+        .addOnFailureListener(e -> event("error", "スキャンを使えません（Google Play 開発者サービスが必要です）：" + e.getMessage()));
+  }
+
+  void scanned(Intent data) throws Exception {
+    com.google.mlkit.vision.documentscanner.GmsDocumentScanningResult r =
+        com.google.mlkit.vision.documentscanner.GmsDocumentScanningResult.fromActivityResultIntent(data);
+    if (r == null || r.getPages() == null || r.getPages().isEmpty()) throw new IOException("スキャンした画像がありませんでした");
+    final JSONObject p = pending;
+    final boolean asPdf = r.getPages().size() > 1 && r.getPdf() != null && !"images".equals(prefs().getString("scanPages", "pdf"));
+    final List<Uri> pages = new ArrayList<>();
+    for (com.google.mlkit.vision.documentscanner.GmsDocumentScanningResult.Page page : r.getPages()) pages.add(page.getImageUri());
+    final Uri pdf = r.getPdf() == null ? null : r.getPdf().getUri();
+    task("スキャンを保存中", () -> {
+      JSONArray files = new JSONArray();
+      if (asPdf) {
+        JSONObject f = ShareActivity.importFile(this, pdf);
+        String stamp = new java.text.SimpleDateFormat("yyyy-MM-dd HHmm", Locale.JAPAN).format(new Date());
+        f.put("label", "スキャン " + stamp + "（" + pages.size() + "ページ）.pdf");
+        files.put(f);
+      } else
+        for (Uri u : pages) {
+          JSONObject f = ShareActivity.importFile(this, u);
+          f.put("label", "").put("mime", "image/jpeg");
+          files.put(f);
+        }
+      event("attached", new JSONObject().put("note", p.getString("note")).put("req", p.optString("req")).put("files", files));
+    });
   }
 
   void external(String url) throws Exception {
@@ -917,6 +997,10 @@ public class MainActivity extends Activity {
       }
       if (result != RESULT_OK) {
         if (request == CAMERA) store.mediaFile(pending.optString("name")).delete();
+        return;
+      }
+      if (request == SCAN_DOC) {
+        scanned(data);
         return;
       }
       if (request == CAMERA) {

@@ -7,6 +7,7 @@
   <!-- Update and settings hubs (series spec §6.1, shared settings §4.0) -->
   <package android:name="app.thetahatch.home"/>
   <package android:name="app.thetahatch.kidshome"/>
+  <package android:name="app.thetahatch.camera"/>
   <intent><action android:name="app.thetahatch.HATCH"/></intent>
   <intent><action android:name="android.media.action.IMAGE_CAPTURE"/></intent>
   <intent><action android:name="android.speech.RecognitionService"/></intent>
@@ -27,6 +28,8 @@
   <intent-filter><action android:name="app.thetahatch.HATCH"/><category android:name="android.intent.category.DEFAULT"/></intent-filter>
   <!-- Theta Home Hatch and other apps: open a new note of a kind (extra "type": text, list, ink, audio, photo). -->
   <intent-filter><action android:name="app.thetahatch.memo.NEW"/><category android:name="android.intent.category.DEFAULT"/></intent-filter>
+  <!-- Another series app's scan button (Theta.Hatch.Series spec §6.2 SCAN; extra mode camera | pick). -->
+  <intent-filter><action android:name="app.thetahatch.action.SCAN"/><category android:name="android.intent.category.DEFAULT"/></intent-filter>
 </activity>
 <activity android:name=".ShareActivity" android:exported="true" android:theme="@style/Invisible" android:label="@string/share_label" android:excludeFromRecents="true" android:noHistory="true" android:taskAffinity="">
   <intent-filter><action android:name="android.intent.action.SEND"/><category android:name="android.intent.category.DEFAULT"/><data android:mimeType="*/*"/></intent-filter>
@@ -44,6 +47,7 @@
   <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE"/></intent-filter>
   <meta-data android:name="android.appwidget.provider" android:resource="@xml/note_widget_info"/>
 </receiver>
+<receiver android:name=".Widgets$Pinned" android:exported="false"/>
 <service android:name=".Widgets$ListService" android:exported="false" android:permission="android.permission.BIND_REMOTEVIEWS"/>
 <service android:name=".Widgets$NoteService" android:exported="false" android:permission="android.permission.BIND_REMOTEVIEWS"/>
 <service android:name=".RecordingService" android:exported="false" android:foregroundServiceType="microphone"/>

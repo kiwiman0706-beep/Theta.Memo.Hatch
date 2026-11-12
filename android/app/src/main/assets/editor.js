@@ -581,6 +581,7 @@
     function addMenu(anchor) {
       App.menu(anchor, [
         ['📷 写真を撮る', function () { App.native('camera', { note: n.id }); }],
+        ['📄 スキャン（書類・名刺・チラシ）', function () { App.native('scan', { note: n.id }); }],
         ['🖼 画像・ファイルを追加', function () { App.native('attach', { note: n.id }); }],
         ['✎ 手書き', insertInk],
         ['🎤 録音', startRecording],
@@ -654,6 +655,13 @@
         }]);
       }
       items.push(['⤴ 送る', function () { flush(); App.native('shareNote', { id: n.id }); }]);
+      if (!readOnly) items.push(['▣ ホーム画面に置く（ウィジェット）', function () {
+        if (isNew && empty()) { App.toast('先にメモを書いてください'); return; }
+        isNew = false;
+        saved = false;
+        flush();
+        App.native('pinWidget', { note: n.id });
+      }]);
       items.push(['📋 テキストをコピー', function () { flush(); App.native('copyText', { text: (n.title ? n.title + '\n\n' : '') + MD.plain(n.body) }); }]);
       if (!readOnly) {
         var hasList = blocks.some(function (b) { return b.t === 'list'; });
@@ -1126,6 +1134,7 @@
       if (kind === 'ink') insertInk();
       else if (kind === 'audio') startRecording();
       else if (kind === 'photo') App.native('camera', { note: n.id });
+      else if (kind === 'scan') App.native('scan', { note: n.id });
       else if (kind === 'file') App.native('attach', { note: n.id });
       else if (kind === 'list' && !root.contains(document.activeElement)) focusItem(0, 0, 0);
       else if (isNew && !root.contains(document.activeElement)) { var rt = list.querySelector('.rt'); if (rt) rt.focus(); }

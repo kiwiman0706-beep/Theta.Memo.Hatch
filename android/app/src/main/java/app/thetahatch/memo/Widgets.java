@@ -175,6 +175,20 @@ public final class Widgets {
     }
   }
 
+  // A note widget placed from inside a note ("ホーム画面に置く"): Android sends the new widget's id.
+  public static class Pinned extends BroadcastReceiver {
+    @Override
+    public void onReceive(Context c, Intent i) {
+      int id = i.getIntExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, AppWidgetManager.INVALID_APPWIDGET_ID);
+      String note = i.getStringExtra(EXTRA_OPEN);
+      if (id == AppWidgetManager.INVALID_APPWIDGET_ID || note == null) return;
+      c.getSharedPreferences("prefs", 0).edit().putString(PREF + id, note).apply();
+      AppWidgetManager m = AppWidgetManager.getInstance(c);
+      m.updateAppWidget(id, NoteWidget.views(c, id));
+      m.notifyAppWidgetViewDataChanged(new int[] {id}, R.id.n_list);
+    }
+  }
+
   // ---- a single note --------------------------------------------------------------
 
   public static class NoteWidget extends AppWidgetProvider {

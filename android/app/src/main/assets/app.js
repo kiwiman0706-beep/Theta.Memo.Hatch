@@ -763,7 +763,7 @@
     a.innerHTML = '<b>メモ一覧</b><span>固定したメモと最近のメモ。上のボタンでテキスト・リスト・手書き・音声・写真のメモをすぐ作れます</span>';
     a.onclick = function () { App.native('pinWidget', { kind: 'list' }); };
     var b = el('button', 'choice');
-    b.innerHTML = '<b>1つのメモ</b><span>選んだメモをそのまま表示。リストはホーム画面でチェックできます</span>';
+    b.innerHTML = '<b>1つのメモ</b><span>選んだメモをそのまま表示。リストはホーム画面でチェックできます。メモの「⋮」→「ホーム画面に置く」からも置けます</span>';
     b.onclick = function () { App.native('pinWidget', { kind: 'note' }); };
     body.appendChild(a);
     body.appendChild(b);
@@ -896,6 +896,7 @@
     sh.appendChild(shb);
     sh.appendChild(el('span', '', 'ピン留めしたメモを Theta Home Hatch の「MemoHatch」タブ（棚）に並べる'));
     body.appendChild(sh);
+    body.appendChild(field('スキャンで何ページか撮ったとき', select([['pdf', '1つの PDF にまとめる'], ['images', 'ページごとの画像にする']], st.scanPages || 'pdf', function (v) { App.native('settings', { scanPages: v }); })));
 
     body.appendChild(el('h3', '', 'このアプリ'));
     body.appendChild(el('p', 'muted', 'Theta Memo Hatch ' + (st.version || '') + '　データの形式：Theta Vault（Obsidian形式）'));
@@ -1110,6 +1111,7 @@
     $('#new-image').onclick = function (e) {
       App.menu(e.currentTarget, [
         ['📷 写真を撮る', function () { App.newNote('photo'); }],
+        ['📄 スキャン（書類・名刺・チラシ）', function () { App.newNote('scan'); }],
         ['🖼 画像・ファイルを選ぶ', function () { App.newNote('file'); }]
       ]);
     };
