@@ -39,6 +39,13 @@ public class MainActivity extends Activity {
   final ExecutorService io = Executors.newSingleThreadExecutor();
   final ExecutorService bg = Executors.newCachedThreadPool();
   JSONObject pending = new JSONObject(); // what a picker / camera result belongs to
+
+  // Kept on disk too: Android may close this app while the camera is open, and what was taken
+  // must still find its note when the app comes back.
+  void setPending(JSONObject p) {
+    pending = p;
+    prefs().edit().putString("pending", p.toString()).apply();
+  }
   Runnable afterPermission;
   String launch = "";
 
@@ -71,6 +78,10 @@ public class MainActivity extends Activity {
       return;
     }
     instance = this;
+    try {
+      pending = new JSONObject(prefs().getString("pending", "{}"));
+    } catch (Exception ignored) {
+    }
     web = new WebView(this);
     web.setBackgroundColor(Color.rgb(248, 249, 250));
     WebSettings s = web.getSettings();
@@ -266,7 +277,7 @@ public class MainActivity extends Activity {
     String open = i.getStringExtra(Widgets.EXTRA_OPEN);
     String kind = i.getStringExtra(Widgets.EXTRA_NEW);
     if (ACTION_SCAN.equals(i.getAction())) {
-      kind = "pick".equals(i.getStringExtra("mode")) ? "file" : "scan";
+      kind = "pick".equals(i.getStringExtra("mode")) ? "file" : captureIntent() != null ? "photo" : "scan";
       scanCaller = true;
       i.setAction(null);
     }
@@ -581,7 +592,7 @@ public class MainActivity extends Activity {
           return;
         }
       case "attach":
-        pending = new JSONObject().put("note", q.getString("note")).put("req", q.optString("req"));
+        setPending(new JSONObject().put("note", q.getString("note")).put("req", q.optString("req")));
         startActivityForResult(
             new Intent(Intent.ACTION_OPEN_DOCUMENT).addCategory(Intent.CATEGORY_OPENABLE).setType(q.optString("accept", "*/*")).putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true),
             PICK_FILES);
@@ -591,7 +602,7 @@ public class MainActivity extends Activity {
         {
           String name = Store.newName(".jpg");
           File f = store.mediaFile(name);
-          pending = new JSONObject().put("note", q.getString("note")).put("name", name).put("req", q.optString("req"));
+          setPending(new JSONObject().put("note", q.getString("note")).put("name", name).put("req", q.optString("req")));
           Uri u = FileProvider.getUriForFile(this, getPackageName() + ".files", f);
           Intent i = new Intent(MediaStore.ACTION_IMAGE_CAPTURE).putExtra(MediaStore.EXTRA_OUTPUT, u)
               .addFlags(Intent.FLAG_GRANT_WRITE_URI_PERMISSION | Intent.FLAG_GRANT_READ_URI_PERMISSION);
@@ -774,7 +785,7 @@ public class MainActivity extends Activity {
         refresh();
         return;
       case "importKeep":
-        pending = new JSONObject().put("trashed", q.optBoolean("trashed"));
+        setPending(new JSONObject().put("trashed", q.optBoolean("trashed")));
         startActivityForResult(
             new Intent(Intent.ACTION_OPEN_DOCUMENT).addCategory(Intent.CATEGORY_OPENABLE).setType("*/*")
                 .putExtra(Intent.EXTRA_MIME_TYPES, new String[] {"application/zip", "application/x-zip-compressed", "application/octet-stream"})
@@ -899,7 +910,7 @@ public class MainActivity extends Activity {
   boolean capture(JSONObject q, String mode) throws Exception {
     Intent i = captureIntent();
     if (i == null) return false;
-    pending = new JSONObject().put("note", q.getString("note")).put("req", q.optString("req"));
+    setPending(new JSONObject().put("note", q.getString("note")).put("req", q.optString("req")));
     i.putExtra("source", "memo")
         .putExtra("mode", mode)
         .putExtra("modes", new String[] {"photo", "video", "scan"})
@@ -935,7 +946,7 @@ public class MainActivity extends Activity {
         else f.put("label", "");
         files.put(f);
       }
-      event("attached", new JSONObject().put("note", p.getString("note")).put("req", p.optString("req")).put("files", files));
+      deliverAttached(p, files);
     });
   }
 
@@ -943,7 +954,7 @@ public class MainActivity extends Activity {
   // cleans up the page; several pages can be taken. One page becomes a picture in the note, more
   // pages one PDF (with the pages also as pictures when asked).
   void scan(JSONObject q) throws Exception {
-    pending = new JSONObject().put("note", q.getString("note")).put("req", q.optString("req"));
+    setPending(new JSONObject().put("note", q.getString("note")).put("req", q.optString("req")));
     com.google.mlkit.vision.documentscanner.GmsDocumentScannerOptions options =
         new com.google.mlkit.vision.documentscanner.GmsDocumentScannerOptions.Builder()
             .setGalleryImportAllowed(true)
@@ -986,8 +997,22 @@ public class MainActivity extends Activity {
           f.put("label", "").put("mime", "image/jpeg");
           files.put(f);
         }
-      event("attached", new JSONObject().put("note", p.getString("note")).put("req", p.optString("req")).put("files", files));
+      deliverAttached(p, files);
     });
+  }
+
+  // Files for a note: into the open editor, or straight into the stored note (created if it was a
+  // new, still empty note) — nothing taken is ever dropped.
+  void deliverAttached(JSONObject p, JSONArray files) throws Exception {
+    String note = p.optString("note");
+    setPending(new JSONObject());
+    if (note.isEmpty()) note = Store.empty().getString("id");
+    if (Memo.editing(note)) {
+      event("attached", new JSONObject().put("note", note).put("req", p.optString("req")).put("files", files));
+      return;
+    }
+    Memo.attach(this, note, files);
+    toast(files.length() + " 件をメモに入れました");
   }
 
   void external(String url) throws Exception {
@@ -1044,12 +1069,13 @@ public class MainActivity extends Activity {
         runToken(w, r.getAccessToken());
         return;
       }
-      if (result != RESULT_OK) {
-        if (request == CAMERA) store.mediaFile(pending.optString("name")).delete();
+      // Camera Hatch may hand things back even when the person left without "完了".
+      if (request == CAPTURE && data != null && (data.getClipData() != null || data.getData() != null)) {
+        captured(data);
         return;
       }
-      if (request == CAPTURE) {
-        captured(data);
+      if (result != RESULT_OK) {
+        if (request == CAMERA) store.mediaFile(pending.optString("name")).delete();
         return;
       }
       if (request == SCAN_DOC) {
@@ -1059,8 +1085,7 @@ public class MainActivity extends Activity {
       if (request == CAMERA) {
         String name = pending.getString("name");
         if (!store.mediaFile(name).isFile() || store.mediaFile(name).length() == 0) throw new IOException("写真を受け取れませんでした");
-        event("attached", new JSONObject().put("note", pending.getString("note")).put("req", pending.optString("req"))
-            .put("files", new JSONArray().put(new JSONObject().put("name", name).put("label", "").put("mime", "image/jpeg"))));
+        deliverAttached(pending, new JSONArray().put(new JSONObject().put("name", name).put("label", "").put("mime", "image/jpeg")));
         return;
       }
       List<Uri> uris = new ArrayList<>();
@@ -1073,7 +1098,7 @@ public class MainActivity extends Activity {
         task("ファイルを取り込み中", () -> {
           JSONArray files = new JSONArray();
           for (Uri u : uris) files.put(ShareActivity.importFile(this, u));
-          event("attached", new JSONObject().put("note", p.getString("note")).put("req", p.optString("req")).put("files", files));
+          deliverAttached(p, files);
         });
       } else if (request == IMPORT_KEEP) {
         final boolean trashed = pending.optBoolean("trashed");

@@ -363,3 +363,6 @@ body.drawer-open #drawer-back { display: block; }
 .vault-row > b { display: block; }
 .vault-row > span { display: block; font-size: 12px; word-break: break-all; }
 .settings .check-row small { font-size: 12px; }
+/* The editor's footer has many one-tap buttons: they narrow on small phones instead of overflowing. */
+.ed-foot .icon { flex: 0 1 40px; min-width: 30px; }
+.ed-foot .ed-stamp { min-width: 0; }

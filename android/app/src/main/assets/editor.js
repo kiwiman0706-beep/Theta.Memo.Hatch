@@ -124,6 +124,7 @@
       footBtn('🗑', '完全に削除', function () { if (confirm('このメモを完全に削除しますか？')) { App.native('delete', { id: n.id }); destroy(); } });
     } else {
       footBtn('＋', '追加', function (e) { addMenu(e.currentTarget); });
+      footBtn('📷', 'カメラ', function () { App.native('camera', { note: n.id }); });
       footBtn('🎨', '色', function (e) { App.colorPicker(e.currentTarget, n.color, function (c) { n.color = c; root.className = 'editor c-' + (c || 'default'); changed(); }); });
       footBtn('🏷', 'ラベル', function () { App.labelDialog([n], function (l) { n.labels = l; paintLabels(); changed(); }); });
       footBtn('🎤', '録音', function () { startRecording(); });
@@ -583,7 +584,7 @@
       App.menu(anchor, [
         ['📷 写真を撮る', function () { App.native('camera', { note: n.id }); }],
         ['📄 スキャン（書類・名刺・チラシ）', function () { App.native('scan', { note: n.id }); }],
-        ['🖼 画像・ファイルを追加', function () { App.native('attach', { note: n.id }); }],
+        ['🖼 写真・ファイルを選ぶ', function () { App.native('attach', { note: n.id }); }],
         ['✎ 手書き', insertInk],
         ['🎤 録音', startRecording],
         ['☑ チェックボックス', function () { var at = insert({ t: 'list', items: [{ text: '', checked: false, indent: 0 }] }); focusItem(at, 0, 0); }],

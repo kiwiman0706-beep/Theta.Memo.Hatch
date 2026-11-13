@@ -292,7 +292,8 @@ const MOCK = `
   // Scan mode and a note placed on the home screen
   {
     const c = await page(390, 844);
-    await c.click('#new-image');
+    await c.click('#new-text');
+    await c.click('.ed-foot .icon[title="追加"]');
     await c.click('.menu button:has-text("スキャン")');
     await c.waitForSelector('.blk-file.k-pdf');
     await c.waitForTimeout(900);
@@ -302,6 +303,23 @@ const MOCK = `
     await c.click('.menu button:has-text("ホーム画面に置く")');
     const pin = await c.evaluate(() => window.__calls.filter(x => x.action === 'pinWidget').pop());
     assert.strictEqual(pin.note, sv.id);
+    await c.context().close();
+    passed++;
+  }
+
+  // One tap: the camera button opens the camera, the picture button the picker; the editor footer fits at 320px
+  {
+    const c = await page(320, 640);
+    await c.click('#new-camera');
+    await c.waitForSelector('.editor');
+    await c.waitForTimeout(200);
+    assert.ok(await c.evaluate(() => window.__calls.some(x => x.action === 'camera')), 'camera opens at once');
+    const foot = await c.evaluate(() => { const f = document.querySelector('.ed-foot'); return f.scrollWidth - f.clientWidth; });
+    assert.ok(foot <= 0, 'editor footer overflow ' + foot);
+    await c.click('.ed-head .icon >> nth=0');
+    await c.click('#new-image');
+    await c.waitForTimeout(200);
+    assert.ok(await c.evaluate(() => window.__calls.some(x => x.action === 'attach')), 'picker opens at once');
     await c.context().close();
     passed++;
   }

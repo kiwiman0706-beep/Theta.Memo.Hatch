@@ -1108,13 +1108,9 @@
     $('#new-list').onclick = function () { App.newNote('list'); };
     $('#new-ink').onclick = function () { App.newNote('ink'); };
     $('#new-audio').onclick = function () { App.newNote('audio'); };
-    $('#new-image').onclick = function (e) {
-      App.menu(e.currentTarget, [
-        ['📷 写真を撮る', function () { App.newNote('photo'); }],
-        ['📄 スキャン（書類・名刺・チラシ）', function () { App.newNote('scan'); }],
-        ['🖼 画像・ファイルを選ぶ', function () { App.newNote('file'); }]
-      ]);
-    };
+    // One tap each: the camera (Camera Hatch: photo / video / scan) and picking photos or files.
+    $('#new-camera').onclick = function () { App.newNote('photo'); };
+    $('#new-image').onclick = function () { App.newNote('file'); };
     $('#sel-cancel').onclick = function () { App.selected = {}; render(); };
     $('#sel-pin').onclick = function () {
       var ids = Object.keys(App.selected);

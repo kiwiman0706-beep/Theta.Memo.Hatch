@@ -35,6 +35,26 @@ public final class Memo {
     return n.getString("id");
   }
 
+  // Attachments for a note that is not open: appended as embeds (the note is made if missing).
+  public static synchronized void attach(Context c, String id, org.json.JSONArray files) throws Exception {
+    Store s = store(c);
+    JSONObject n = s.find(id);
+    if (n == null) {
+      n = Store.empty();
+      n.put("id", id);
+    }
+    StringBuilder b = new StringBuilder();
+    for (int i = 0; i < files.length(); i++) {
+      JSONObject f = files.getJSONObject(i);
+      if (b.length() > 0) b.append("\n");
+      b.append(ShareActivity.embed(f.getString("name"), f.optString("label")));
+    }
+    n.put("body", Notes.append(n.optString("body"), b.toString()));
+    s.put(n);
+    MainActivity.post("changed", n.getString("id"));
+    Widgets.update(c);
+  }
+
   public static synchronized void transcript(Context c, String id, String name, String text) throws Exception {
     if (editing(id)) {
       MainActivity.post("transcript", new JSONObject().put("note", id).put("name", name).put("text", text));
