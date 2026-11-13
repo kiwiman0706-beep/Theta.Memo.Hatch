@@ -36,6 +36,7 @@ public class MainActivity extends Activity {
   WebView web;
   Store store;
   boolean ready, busy;
+  final List<String> early = new ArrayList<>(); // toasts / errors from before the page was ready
   final ExecutorService io = Executors.newSingleThreadExecutor();
   final ExecutorService bg = Executors.newCachedThreadPool();
   JSONObject pending = new JSONObject(); // what a picker / camera result belongs to
@@ -245,6 +246,7 @@ public class MainActivity extends Activity {
       String json = new JSONObject().put("type", type).put("data", data == null ? JSONObject.NULL : data).toString();
       runOnUiThread(() -> {
         if (web != null && ready) web.evaluateJavascript("window.onNative(" + json + ")", null);
+        else if (("toast".equals(type) || "error".equals(type)) && early.size() < 20) early.add(json);
       });
     } catch (Exception ignored) {
     }
@@ -388,10 +390,7 @@ public class MainActivity extends Activity {
   // ---- work ---------------------------------------------------------------------------
 
   void task(String title, Work work) {
-    if (busy) {
-      toast("処理が終わるまでお待ちください");
-      return;
-    }
+    // Never turn work away (a camera result that came back during a sync would be lost): io runs one at a time.
     busy = true;
     event("busy", title);
     getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
@@ -544,6 +543,8 @@ public class MainActivity extends Activity {
         ready = true;
         refresh();
         sendNotes();
+        for (String j : early) web.evaluateJavascript("window.onNative(" + j + ")", null);
+        early.clear();
         if (!launch.isEmpty()) runLaunch();
         bg.execute(() -> {
           if (Series.fromHub(this)) refresh();
@@ -813,6 +814,14 @@ public class MainActivity extends Activity {
           });
           return;
         }
+      case "attachStore": // the editor for that note had gone: put the files in the stored note
+        Memo.attach(this, q.getString("note"), q.getJSONArray("files"));
+        clog("メモ " + q.getString("note") + " に保存（エディタが閉じていた）");
+        toast(q.getJSONArray("files").length() + " 件をメモに入れました");
+        return;
+      case "cameraStatus":
+        event("cameraStatus", cameraStatus());
+        return;
       case "settings":
         {
           SharedPreferences.Editor e = prefs().edit();
@@ -900,6 +909,29 @@ public class MainActivity extends Activity {
     }
   }
 
+  // A short record of each camera hand-off (設定 → カメラ連携), so a lost photo can be traced.
+  void clog(String line) {
+    String t = new java.text.SimpleDateFormat("MM-dd HH:mm:ss", Locale.JAPAN).format(new Date());
+    String old = prefs().getString("captureLog", "");
+    String all = t + " " + line + "\n" + old;
+    if (all.length() > 4000) all = all.substring(0, 4000);
+    prefs().edit().putString("captureLog", all).apply();
+  }
+
+  JSONObject cameraStatus() throws Exception {
+    String ver = "";
+    try {
+      ver = getPackageManager().getPackageInfo(CAMERA_HATCH, 0).versionName;
+    } catch (Exception e) {
+      ver = "";
+    }
+    return new JSONObject()
+        .put("camera", ver)
+        .put("capture", new Intent(ACTION_CAPTURE).setPackage(CAMERA_HATCH).resolveActivity(getPackageManager()) != null)
+        .put("share", checkSelfPermission("app.thetahatch.permission.SHARE") == android.content.pm.PackageManager.PERMISSION_GRANTED)
+        .put("log", prefs().getString("captureLog", ""));
+  }
+
   // Theta Camera Hatch, when installed (spec §6.2 CAPTURE): photos, videos and scans in one camera
   // screen, any number, handed back to this note. Without it, the phone's camera / Google's scanner.
   Intent captureIntent() {
@@ -909,7 +941,10 @@ public class MainActivity extends Activity {
 
   boolean capture(JSONObject q, String mode) throws Exception {
     Intent i = captureIntent();
-    if (i == null) return false;
+    if (i == null) {
+      clog("Camera Hatch の CAPTURE が見つからない → 端末のカメラ");
+      return false;
+    }
     setPending(new JSONObject().put("note", q.getString("note")).put("req", q.optString("req")));
     i.putExtra("source", "memo")
         .putExtra("mode", mode)
@@ -918,9 +953,13 @@ public class MainActivity extends Activity {
         .putExtra("scanFormat", "images".equals(prefs().getString("scanPages", "pdf")) ? "images" : "pdf");
     try {
       startActivityForResult(i, CAPTURE);
+      clog("Camera Hatch を開いた（" + mode + "、メモ " + q.getString("note") + "）");
       return true;
     } catch (Exception e) {
-      return false; // e.g. an older Camera Hatch, or this app not signed with the series key
+      // e.g. an older Camera Hatch, or this app not signed with the series key
+      clog("Camera Hatch を開けない：" + e);
+      toast("Camera Hatch を開けませんでした（" + e.getClass().getSimpleName() + "）。端末のカメラで撮ります");
+      return false;
     }
   }
 
@@ -935,6 +974,7 @@ public class MainActivity extends Activity {
     if (uris.isEmpty() && data != null && data.getData() != null) uris.add(data.getData());
     if (uris.isEmpty()) throw new IOException("Camera Hatch から受け取れるものがありませんでした");
     final JSONObject p = pending;
+    clog("受け取り " + uris.size() + " 件 → メモ " + p.optString("note", "（新しいメモ）"));
     task("撮ったものを取り込み中", () -> {
       JSONArray files = new JSONArray();
       String stamp = new java.text.SimpleDateFormat("yyyy-MM-dd HHmm", Locale.JAPAN).format(new Date());
@@ -1007,7 +1047,8 @@ public class MainActivity extends Activity {
     String note = p.optString("note");
     setPending(new JSONObject());
     if (note.isEmpty()) note = Store.empty().getString("id");
-    if (Memo.editing(note)) {
+    clog("メモ " + note + " に " + files.length() + " 件（" + (Memo.editing(note) && ready ? "開いているメモへ" : "保存したメモへ") + "）");
+    if (Memo.editing(note) && ready) {
       event("attached", new JSONObject().put("note", note).put("req", p.optString("req")).put("files", files));
       return;
     }
@@ -1069,15 +1110,21 @@ public class MainActivity extends Activity {
         runToken(w, r.getAccessToken());
         return;
       }
+      if (request == CAPTURE || request == CAMERA)
+        clog("戻った：" + (request == CAPTURE ? "Camera Hatch" : "端末のカメラ") + " 結果 " + (result == RESULT_OK ? "OK" : "取り消し") + "、"
+            + (data == null ? "データ無し" : (data.getClipData() != null ? data.getClipData().getItemCount() + " 件" : data.getData() != null ? "1 件" : "0 件")));
       // Camera Hatch may hand things back even when the person left without "完了".
       if (request == CAPTURE && data != null && (data.getClipData() != null || data.getData() != null)) {
         captured(data);
         return;
       }
-      if (result != RESULT_OK) {
-        if (request == CAMERA) store.mediaFile(pending.optString("name")).delete();
-        return;
-      }
+      if (request == CAMERA && result != RESULT_OK) {
+        File f = store.mediaFile(pending.optString("name"));
+        if (!f.isFile() || f.length() == 0) {
+          f.delete();
+          return;
+        }
+      } else if (result != RESULT_OK) return;
       if (request == SCAN_DOC) {
         scanned(data);
         return;

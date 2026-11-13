@@ -1144,7 +1144,7 @@
   };
 
   var Transcribing = {};
-  App.on('attached', function (d) { if (Editor.current && Editor.current.note.id === d.note) Editor.current.attached(d); else if (App.byId[d.note]) attachClosed(d); });
+  App.on('attached', function (d) { if (Editor.current && Editor.current.note.id === d.note) Editor.current.attached(d); else if (App.byId[d.note]) attachClosed(d); else App.native('attachStore', d); });
   App.on('inkSaved', function (d) { if (Editor.current && Editor.current.note.id === d.note) Editor.current.inkSaved(d); });
   App.on('inkStrokes', function (d) { if (Editor.current) Editor.current.inkStrokes(d); });
   App.on('recording', function (d) { App.state.recording = d && d.note || ''; if (Editor.current) Editor.current.recording(d); });

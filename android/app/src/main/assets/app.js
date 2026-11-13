@@ -898,6 +898,10 @@
     body.appendChild(sh);
     body.appendChild(field('スキャンで何ページか撮ったとき', select([['pdf', '1つの PDF にまとめる'], ['images', 'ページごとの画像にする']], st.scanPages || 'pdf', function (v) { App.native('settings', { scanPages: v }); })));
 
+    var cam = el('button', '', 'カメラ連携を確かめる');
+    cam.onclick = function () { App.native('cameraStatus', {}); };
+    body.appendChild(cam);
+
     body.appendChild(el('h3', '', 'このアプリ'));
     body.appendChild(el('p', 'muted', 'Theta Memo Hatch ' + (st.version || '') + '　データの形式：Theta Vault（Obsidian形式）'));
     var upd = el('button', '', '更新を確認');
@@ -905,6 +909,19 @@
     body.appendChild(upd);
     App.sheet('設定', body, [['閉じる']], { wide: true });
   }
+
+  App.on('cameraStatus', function (d) {
+    var b = el('div');
+    b.appendChild(el('p', '', 'Theta Camera Hatch：' + (d.camera ? d.camera : '入っていません')));
+    b.appendChild(el('p', '', '撮って返す（CAPTURE）：' + (d.capture ? '使える' : '見つからない')));
+    b.appendChild(el('p', '', 'シリーズの権限：' + (d.share ? 'あり' : 'なし（Memo と Camera の署名が違う）')));
+    b.appendChild(el('h3', '', '最近の記録'));
+    var pre = el('pre', 'log', d.log || '（まだありません）');
+    pre.style.whiteSpace = 'pre-wrap';
+    pre.style.fontSize = '12px';
+    b.appendChild(pre);
+    App.sheet('カメラ連携', b, [['コピー', function () { App.native('copyText', { text: 'Camera ' + d.camera + ' capture=' + d.capture + ' share=' + d.share + '\n' + d.log }); }], ['閉じる']]);
+  });
 
   function copyRow(label, value) {
     var r = el('div', 'copy-row');
