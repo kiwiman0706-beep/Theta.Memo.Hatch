@@ -803,6 +803,34 @@
     list.forEach(function (m) { var o = el('option', '', m); o.value = m; if (m === cur) o.selected = true; modelSelect.appendChild(o); });
   }
 
+  // The last sync's problems: one summary line, the same cause counted once, the list folded.
+  function syncErrors(text) {
+    var lines = String(text).split('\n').filter(function (l) { return l.trim(); });
+    var groups = {}, order = [];
+    lines.forEach(function (l) {
+      var m = /^(.*?)：(.*?)：(.*)$/.exec(l);           // "Google ドライブ：note：cause"
+      var key = m ? m[1] + '：' + m[3].replace(/"[^"]*"/g, '…') : l;
+      if (!groups[key]) { groups[key] = { first: l, n: 0, where: m ? m[1] : '', why: m ? m[3] : l }; order.push(key); }
+      groups[key].n++;
+    });
+    var box = el('div', 'sync-errors');
+    var head = el('p', 'error-text', '前回の同期で ' + lines.length + ' 件うまくいきませんでした' + (order.length < lines.length ? '（原因は ' + order.length + ' 種類）' : ''));
+    box.appendChild(head);
+    order.slice(0, 2).forEach(function (k) {
+      var g = groups[k];
+      box.appendChild(el('p', 'error-text small', g.n > 1 ? (g.where ? g.where + '：' : '') + g.why + '（' + g.n + ' 件）' : g.first));
+    });
+    if (lines.length > 2) {
+      var more = el('details', 'sync-more');
+      more.appendChild(el('summary', '', '詳しく（全部で ' + lines.length + ' 件）'));
+      var pre = el('div', 'error-text small');
+      pre.textContent = lines.join('\n');
+      more.appendChild(pre);
+      box.appendChild(more);
+    }
+    return box;
+  }
+
   function settings() {
     var st = App.state;
     var body = el('div', 'settings');
@@ -811,7 +839,7 @@
     sync.appendChild(el('p', '', st.nasEnabled || st.syncEnabled
       ? '「Theta Vault/Memo/」と同期しています。' + (st.lastSync ? '最終：' + when(st.lastSync) : '')
       : 'メモはこの端末だけにあります。NAS や Google ドライブと同期すると、ほかの端末や PC・Mac（Obsidian）でも開けます。'));
-    if (st.syncError) sync.appendChild(el('p', 'error-text', st.syncError));
+    if (st.syncError) sync.appendChild(syncErrors(st.syncError));
     if (st.nasEnabled || st.syncEnabled) {
       var now = el('button', 'primary', '今すぐ同期');
       now.onclick = function () { App.native('syncNow'); };

@@ -35,7 +35,9 @@ public final class VaultSync {
       if (mediaUp + mediaDown > 0) parts.add("添付 " + (mediaUp + mediaDown) + "件");
       StringBuilder b = new StringBuilder("Theta Vaultと同期しました");
       if (!parts.isEmpty()) b.append("（").append(String.join(" / ", parts)).append("）");
-      for (String e : errors) b.append("\n").append(e);
+      // The toast shows a few; the settings screen has them all.
+      for (int i = 0; i < Math.min(3, errors.size()); i++) b.append("\n").append(errors.get(i));
+      if (errors.size() > 3) b.append("\nほか ").append(errors.size() - 3).append(" 件（設定で見られます）");
       return b.toString();
     }
   }
@@ -199,12 +201,22 @@ public final class VaultSync {
     for (Iterator<String> it = x.known.keys(); it.hasNext(); ) ids.add(it.next());
 
     for (Map.Entry<String, Remote> e : remote.entrySet()) x.byTitle.put(title(e.getValue().name), e.getKey());
-    int n = 0;
+    int n = 0, offline = 0;
     for (String id : ids) {
       if (++n % 10 == 0) progress.update("Theta Vaultと同期中 " + n + " / " + ids.size());
       try {
         step(x, id, local.get(id), tomb.has(id), remote.get(id));
+        offline = 0;
       } catch (Exception e) {
+        // The connection went away: stop here (what is done is kept; the next sync goes on)
+        // rather than one failure per remaining note.
+        if (offline(e)) {
+          if (++offline >= 3) {
+            x.res.errors.add("ネットにつながらないため途中でやめました（" + n + " / " + ids.size() + "。次の同期で続きから）");
+            break;
+          }
+          continue;
+        }
         x.res.errors.add(label(local.get(id), id) + "：" + e.getMessage());
         String m = String.valueOf(e.getMessage());
         if (m.contains("HTTP 401") || m.contains("HTTP 403")) break;
@@ -228,6 +240,13 @@ public final class VaultSync {
       }
     saveIndex(x.s, x.name, index);
     return x.res;
+  }
+
+  static boolean offline(Throwable e) {
+    for (Throwable t = e; t != null; t = t.getCause())
+      if (t instanceof java.net.UnknownHostException || t instanceof java.net.SocketException || t instanceof java.net.SocketTimeoutException
+          || t instanceof javax.net.ssl.SSLException || t instanceof java.net.NoRouteToHostException) return true;
+    return false;
   }
 
   // .theta/vault.json lists the Theta apps sharing this vault; add ourselves, keep the rest.

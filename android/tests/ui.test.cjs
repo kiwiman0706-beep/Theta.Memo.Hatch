@@ -205,10 +205,26 @@ const MOCK = `
   passed++;
 
   // Settings and the Keep import sheet open without errors
+  // A long list of sync problems is folded: a summary, the same cause counted once
+  await p.evaluate(() => {
+    var e = [];
+    for (var i = 0; i < 60; i++) e.push('Google ドライブ：メモ' + i + '：Unable to resolve host "www.googleapis.com": No address associated with hostname');
+    e.push('Google ドライブ：電話線：Software caused connection abort');
+    window.onNative({ type: 'state', data: Object.assign({}, App.state, { syncError: e.join('\n') }) });
+  });
   await p.click('#menu');
   await p.click('.drawer-item:has-text("設定")');
   await p.waitForSelector('.sheet .settings');
+  assert.strictEqual(await p.locator('.sync-errors > p').count(), 3, 'summary + one line per cause');
+  assert.ok((await p.locator('.sync-errors > p >> nth=1').textContent()).includes('（60 件）'));
+  assert.ok(!(await p.locator('.sync-more .error-text').isVisible()), 'the full list is folded');
+  // Work in progress sits near the bottom and lets taps through to the menus
+  await p.evaluate(() => window.onNative({ type: 'busy', data: 'Google ドライブ：Theta Vaultと同期中 2630 / 2631' }));
+  const bb = await p.locator('#busy').boundingBox();
+  assert.ok(bb.y > 400, 'not over the top bar');
+  assert.strictEqual(await p.locator('#busy').evaluate(e => getComputedStyle(e).pointerEvents), 'none');
   await p.screenshot({ path: path.join(SHOTS, 'settings.png') });
+  await p.evaluate(() => window.onNative({ type: 'busy', data: '' }));
   await p.click('.sheet-buttons button:has-text("閉じる")');
   await p.click('#menu');
   await p.click('.drawer-item:has-text("Keepから")');

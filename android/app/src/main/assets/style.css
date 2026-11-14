@@ -181,7 +181,8 @@ body.drawer-open #drawer-back { display: block; }
 #toast { position: fixed; left: 50%; bottom: 76px; transform: translate(-50%, 20px); background: #323232; color: #fff; padding: 11px 18px; border-radius: var(--radius); font-size: 14px; z-index: 90; opacity: 0; pointer-events: none; transition: all .2s; max-width: calc(100vw - 24px); white-space: pre-wrap; }
 #toast.show { opacity: 1; transform: translate(-50%, 0); }
 #toast.error { background: #b3261e; }
-#busy { position: fixed; top: 0; left: 0; right: 0; z-index: 95; display: none; background: var(--accent); color: var(--bg); text-align: center; font-size: 13px; padding: 6px; }
+/* Work in progress (a long first sync too): a small label near the bottom, never over the menus. */
+#busy { position: fixed; left: 50%; bottom: calc(68px + env(safe-area-inset-bottom)); transform: translateX(-50%); z-index: 95; display: none; max-width: calc(100% - 32px); background: var(--accent); color: var(--bg); font-size: 12px; padding: 5px 12px; border-radius: 14px; opacity: .92; pointer-events: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; box-shadow: 0 1px 4px rgba(0,0,0,.25); }
 #busy.show { display: block; }
 
 /* ---- editor ---- */
@@ -482,3 +483,7 @@ body.drawer-open #drawer-back { display: block; }
 .sl-stage { position: absolute; inset: 0; }
 .sl-count { position: absolute; right: 14px; bottom: 10px; color: rgba(255,255,255,.6); font-size: 13px; }
 .sl-close { position: absolute; right: 6px; top: 6px; color: #fff; opacity: .7; z-index: 2; }
+
+.sync-errors .small { font-size: 12px; margin: 2px 0; }
+.sync-more summary { font-size: 13px; color: var(--muted); cursor: pointer; padding: 4px 0; }
+.sync-more .error-text { max-height: 40vh; overflow-y: auto; }
