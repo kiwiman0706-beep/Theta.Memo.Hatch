@@ -38,6 +38,9 @@ public class MainActivity extends Activity {
   boolean ready, busy;
   final List<String> early = new ArrayList<>(); // toasts / errors from before the page was ready
   final ExecutorService io = Executors.newSingleThreadExecutor();
+  // What a camera / scanner / picker hands back is copied here, not behind a sync on io.
+  final ExecutorService imports = Executors.newSingleThreadExecutor();
+  boolean cameraReturned;
   final ExecutorService bg = Executors.newCachedThreadPool();
   JSONObject pending = new JSONObject(); // what a picker / camera result belongs to
 
@@ -390,11 +393,19 @@ public class MainActivity extends Activity {
   // ---- work ---------------------------------------------------------------------------
 
   void task(String title, Work work) {
+    taskOn(io, title, work);
+  }
+
+  void importTask(String title, Work work) {
+    taskOn(imports, title, work);
+  }
+
+  void taskOn(ExecutorService on, String title, Work work) {
     // Never turn work away (a camera result that came back during a sync would be lost): io runs one at a time.
     busy = true;
     event("busy", title);
     getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
-    io.execute(() -> {
+    on.execute(() -> {
       try {
         work.run();
       } catch (Exception e) {
@@ -961,7 +972,8 @@ public class MainActivity extends Activity {
       clog("Camera Hatch の CAPTURE が見つからない → 端末のカメラ");
       return false;
     }
-    setPending(new JSONObject().put("note", q.getString("note")).put("req", q.optString("req")));
+    setPending(new JSONObject().put("note", q.getString("note")).put("req", q.optString("req")).put("cam", true));
+    cameraReturned = false;
     i.putExtra("source", "memo")
         .putExtra("mode", mode)
         .putExtra("modes", new String[] {"photo", "video", "scan"})
@@ -991,7 +1003,8 @@ public class MainActivity extends Activity {
     if (uris.isEmpty()) throw new IOException("Camera Hatch から受け取れるものがありませんでした");
     final JSONObject p = pending;
     clog("受け取り " + uris.size() + " 件 → メモ " + p.optString("note", "（新しいメモ）"));
-    task("撮ったものを取り込み中", () -> {
+    final long t0 = System.currentTimeMillis();
+    importTask("撮ったものを取り込み中", () -> {
       JSONArray files = new JSONArray();
       String stamp = new java.text.SimpleDateFormat("yyyy-MM-dd HHmm", Locale.JAPAN).format(new Date());
       for (Uri u : uris) {
@@ -1002,6 +1015,7 @@ public class MainActivity extends Activity {
         else f.put("label", "");
         files.put(f);
       }
+      clog("コピー " + files.length() + " 件（" + (System.currentTimeMillis() - t0) / 100 / 10.0 + " 秒）");
       deliverAttached(p, files);
     });
   }
@@ -1040,7 +1054,7 @@ public class MainActivity extends Activity {
     final List<Uri> pages = new ArrayList<>();
     for (com.google.mlkit.vision.documentscanner.GmsDocumentScanningResult.Page page : r.getPages()) pages.add(page.getImageUri());
     final Uri pdf = r.getPdf() == null ? null : r.getPdf().getUri();
-    task("スキャンを保存中", () -> {
+    importTask("スキャンを保存中", () -> {
       JSONArray files = new JSONArray();
       if (asPdf) {
         JSONObject f = ShareActivity.importFile(this, pdf);
@@ -1126,6 +1140,7 @@ public class MainActivity extends Activity {
         runToken(w, r.getAccessToken());
         return;
       }
+      if (request == CAPTURE || request == CAMERA) cameraReturned = true;
       if (request == CAPTURE || request == CAMERA)
         clog("戻った：" + (request == CAPTURE ? "Camera Hatch" : "端末のカメラ") + " 結果 " + (result == RESULT_OK ? "OK" : "取り消し") + "、"
             + (data == null ? "データ無し" : (data.getClipData() != null ? data.getClipData().getItemCount() + " 件" : data.getData() != null ? "1 件" : "0 件")));
@@ -1158,7 +1173,7 @@ public class MainActivity extends Activity {
       if (uris.isEmpty()) return;
       if (request == PICK_FILES) {
         final JSONObject p = pending;
-        task("ファイルを取り込み中", () -> {
+        importTask("ファイルを取り込み中", () -> {
           JSONArray files = new JSONArray();
           for (Uri u : uris) files.put(ShareActivity.importFile(this, u));
           deliverAttached(p, files);
@@ -1197,6 +1212,14 @@ public class MainActivity extends Activity {
   protected void onResume() {
     super.onResume();
     instance = this;
+    // Back in Memo while a Camera Hatch request had no answer at all (the camera was closed from
+    // the recent apps, or Android ended it): nothing came back, so say so once.
+    if (pending.optBoolean("cam") && !cameraReturned && !(Build.VERSION.SDK_INT >= 24 && isInMultiWindowMode())) {
+      clog("Camera Hatch から何も返らないまま Memo に戻った");
+      setPending(new JSONObject());
+      toast("カメラから何も返ってきませんでした。Camera Hatch の設定「ほかの Hatch に呼ばれたときも自分にも保存」を ON にしておくと、写真が必ずカメラにも残ります");
+    }
+    cameraReturned = false;
     if (ready) {
       refresh();
       if (SyncJob.any(this) && System.currentTimeMillis() - prefs().getLong("lastSync", 0) > 5 * 60 * 1000) sync(true);
@@ -1225,6 +1248,7 @@ public class MainActivity extends Activity {
     if (instance == this) instance = null;
     editing = "";
     io.shutdown();
+    imports.shutdown();
     bg.shutdown();
     if (web != null) {
       web.removeJavascriptInterface("Native");
