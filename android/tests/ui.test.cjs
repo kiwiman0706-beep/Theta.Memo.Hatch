@@ -59,6 +59,7 @@ const MOCK = `
       send('notes', ${JSON.stringify(NOTES)});
     }
     if (q.action === 'camera') send('attached', { note: q.note, files: [{ name: 'cam1.jpg', label: '', mime: 'image/jpeg' }] });
+    if (q.action === 'attach' && /^mm/.test(q.req || '')) send('attached', { note: q.note, req: q.req, files: [{ name: 'pic1.jpg', label: '', mime: 'image/jpeg' }] });
     if (q.action === 'record') send('recording', { note: q.note, start: Date.now() });
     if (q.action === 'stopRecord') { var n = window.__calls.filter(function (c) { return c.action === 'record'; }).pop().note; send('recorded', { note: n, name: 'rec2.m4a', duration: 3000 });
       setTimeout(function () { window.onNative({ type: 'transcript', data: { note: n, name: 'rec2.m4a', text: '書き起こしのテスト' } }); }, 30); }
@@ -408,6 +409,13 @@ const MOCK = `
     await q.screenshot({ path: path.join(SHOTS, 'sheet.png') });
     await q.click('.sv-bar .icon[title="元に戻す"]');
     assert.strictEqual(await q.locator('.sv-col').count(), 3, 'undo brings the column back');
+    await cellIn(0, 2).click();
+    await q.click('.sv-bar .icon[title="選んだマスに写真を入れる"]');
+    await q.waitForSelector('.sv-grid td.pic img');
+    await q.screenshot({ path: path.join(SHOTS, 'sheet-picture.png') });
+    await q.click('.sv-grid td.pic img');
+    await q.click('.menu button:has-text("写真を消す")');
+    assert.strictEqual(await q.locator('.sv-grid td.pic').count(), 0);
     await q.click('.sv-bar .icon[title="閉じる"]');
     await q.waitForTimeout(900);
     const sv = (await saves(q)).pop();
@@ -415,6 +423,41 @@ const MOCK = `
     assert.strictEqual(sv.view, 'sheet');
     assert.strictEqual(sv.body, '| 項目 | 金額 | 列3 |\n| --- | --- | --- |\n| 宿 | 500 |  |\n| 交通 | 1200 |  |\n| 機材 | 3,000 |  |');
     await q.context().close();
+    passed++;
+  }
+
+  // Slides: "---" between slides, pictures fill a slide or sit beside its text; play full screen
+  {
+    const w = await page(390, 844);
+    await w.click('#new-more');
+    await w.click('.menu button:has-text("スライド")');
+    await w.fill('.sheet input', '発表');
+    await w.click('.sheet-buttons button:has-text("決定")');
+    await w.fill('.sl-etitle', '企画の説明');
+    await w.click('.sheet-buttons button:has-text("決定")');
+    await w.click('.sl-bar .icon[title="スライドを足す"]');
+    await w.fill('.sl-etitle', '目的');
+    await w.fill('.sl-etext', '- 売上を伸ばす\n- 知ってもらう');
+    await w.click('.sl-etools button:has-text("写真")');
+    await w.waitForSelector('.sl-preview .sl-pics img');
+    await w.click('.sheet-buttons button:has-text("決定")');
+    assert.strictEqual(await w.locator('.sl-thumb').count(), 2);
+    await w.waitForSelector('.sl-thumb >> nth=1 >> .sl-slide');
+    assert.strictEqual(await w.locator('.sl-thumb >> nth=1').locator('.sl-slide.with-pics').count(), 1, 'text and picture side by side');
+    await w.screenshot({ path: path.join(SHOTS, 'slides.png') });
+    await w.click('.sl-play');
+    await w.waitForSelector('.sl-show .sl-slide');
+    assert.strictEqual(await w.locator('.sl-count').textContent(), '1 / 2');
+    await w.mouse.click(350, 400);
+    assert.strictEqual(await w.locator('.sl-count').textContent(), '2 / 2');
+    await w.screenshot({ path: path.join(SHOTS, 'slides-show.png') });
+    await w.click('.sl-close');
+    await w.waitForTimeout(900);
+    const sv = (await saves(w)).pop();
+    assert.strictEqual(sv.title, '発表');
+    assert.strictEqual(sv.view, 'slides');
+    assert.strictEqual(sv.body, '# 企画の説明\n\n---\n\n## 目的\n\n- 売上を伸ばす\n- 知ってもらう\n\n![[Memo/_files/pic1.jpg]]');
+    await w.context().close();
     passed++;
   }
 

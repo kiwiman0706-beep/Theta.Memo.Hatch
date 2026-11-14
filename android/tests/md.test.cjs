@@ -95,4 +95,17 @@ t('spreadsheet round trip', () => {
   assert.ok(e.fresh);
   assert.strictEqual(S.serialize(e), '| 列1 | 列2 | 列3 |\n| --- | --- | --- |\n|  |  |  |\n|  |  |  |\n|  |  |  |');
 });
+t('slides split and join', () => {
+  const L = require('../app/src/main/assets/slides.js');
+  const body = '# 表紙\n\n---\n\n## 目的\n見出しではない\n---\n\n- a\n\n![[Memo/_files/p.jpg]]\n\n---\n\n```\n---\n```';
+  const s = L.split(body);
+  assert.strictEqual(s.length, 3, '"---" right under text is a heading line, and inside code it is code');
+  assert.strictEqual(L.join(s), body);
+  const p = L.parts(s[1]);
+  assert.strictEqual(p.title, '目的');
+  assert.deepStrictEqual(p.images, ['p.jpg']);
+  assert.ok(!p.text.includes('p.jpg'));
+  assert.strictEqual(L.compose('題', 2, '本文'), '## 題\n\n本文');
+  assert.deepStrictEqual(L.split(''), ['']);
+});
 console.log(n + ' md tests passed');

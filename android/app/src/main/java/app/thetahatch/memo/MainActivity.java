@@ -102,7 +102,7 @@ public class MainActivity extends Activity {
               if (!HOST.equals(u.getHost()) || !"https".equals(u.getScheme())) return blocked();
               String p = u.getPath();
               if (p.equals("/") || p.equals("/index.html")) return response("text/html", getAssets().open("index.html"));
-              if (p.matches("/(app|ink|editor|md|gtd|mindmap|cards|sheet)\\.js")) return response("application/javascript", getAssets().open(p.substring(1)));
+              if (p.matches("/(app|ink|editor|md|gtd|mindmap|cards|sheet|slides)\\.js")) return response("application/javascript", getAssets().open(p.substring(1)));
               if (p.equals("/style.css")) return response("text/css", getAssets().open("style.css"));
               if (p.matches("/lib/[A-Za-z0-9.-]+\\.js")) return response("application/javascript", getAssets().open(p.substring(1)));
               if (p.matches("/lib/[A-Za-z0-9.-]+\\.css")) return response("text/css", getAssets().open(p.substring(1)));
@@ -811,6 +811,22 @@ public class MainActivity extends Activity {
             } catch (Exception e) {
               error(e);
             }
+          });
+          return;
+        }
+      case "present": // slides: sideways, full screen while playing
+        {
+          final boolean on = q.optBoolean("on");
+          runOnUiThread(() -> {
+            setRequestedOrientation(on ? android.content.pm.ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE : android.content.pm.ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED);
+            if (Build.VERSION.SDK_INT >= 30 && getWindow().getInsetsController() != null) {
+              if (on) {
+                getWindow().getInsetsController().hide(android.view.WindowInsets.Type.systemBars());
+                getWindow().getInsetsController().setSystemBarsBehavior(android.view.WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE);
+              } else getWindow().getInsetsController().show(android.view.WindowInsets.Type.systemBars());
+            }
+            if (on) getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+            else getWindow().clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
           });
           return;
         }

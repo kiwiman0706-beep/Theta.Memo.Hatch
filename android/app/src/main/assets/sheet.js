@@ -3,6 +3,7 @@
 // the table stays as it is. Column totals (合計・平均・最大・最小・件数) are only shown, never
 // written, so the note stays an ordinary table that Obsidian and any Markdown reader show.
 (function (root) {
+  var PIC = /^\s*!\[\[(?:Memo\/_files\/)?([A-Za-z0-9_.-]+\.(?:jpe?g|png|gif|webp|bmp|heic|heif))(?:\|[^\]]*)?\]\]\s*$/i;
   var ROW = /^\s*\|.*\|\s*$/, SEP = /^\s*\|?\s*:?-{1,}:?\s*(\|\s*:?-{1,}:?\s*)*\|?\s*$/;
 
   function cells(line) {
@@ -93,7 +94,7 @@
 
   function open(opts) {
     var el = App.el, t = parse(opts.body), title = opts.title || '', ro = !!opts.readOnly;
-    var undo = [], aggs = {}, timer = null, focus = null;
+    var undo = [], aggs = {}, timer = null, focus = null, last = null;
     var wrap = el('div', 'sheet-view');
     var bar = el('div', 'sv-bar');
     var x = el('button', 'icon', '←');
@@ -114,7 +115,10 @@
     var addC = el('button', 'sv-add', '＋列');
     addC.title = '列を足す';
     addC.onclick = function () { insertCol(t.head.length); };
-    if (!ro) { bar.appendChild(addR); bar.appendChild(addC); }
+    var picB = el('button', 'icon', '🖼');
+    picB.title = '選んだマスに写真を入れる';
+    picB.onclick = function () { putPicture(last ? last[0] : 0, last ? last[1] : 0); };
+    if (!ro) { bar.appendChild(addR); bar.appendChild(addC); if (opts.pickImage) bar.appendChild(picB); }
     wrap.appendChild(bar);
     var scroller = el('div', 'sv-scroll');
     wrap.appendChild(scroller);
@@ -192,6 +196,23 @@
 
     function cellEl(r, c, v) {
       var td = el('td', (r < 0 ? 'h' : '') + (t.align[c] === 'r' ? ' r' : t.align[c] === 'c' ? ' c' : '') + (r >= 0 && !isNaN(num(v)) ? ' n' : ''));
+      var pic = r >= 0 && PIC.exec(v);
+      if (pic) {
+        // A cell that holds a picture shows it; tap for 変える / 消す.
+        td.className += ' pic';
+        var im = el('img');
+        im.src = 'thumb/' + pic[1];
+        im.alt = '';
+        im.dataset.r = r;
+        im.dataset.c = c;
+        im.onclick = function () {
+          last = [r, c];
+          if (ro) return;
+          App.menu(im, [['🖼 写真を変える', function () { putPicture(r, c); }], ['🗑 写真を消す', function () { change(function () { t.rows[r][c] = ''; }); }, true]]);
+        };
+        td.appendChild(im);
+        return td;
+      }
       var inp = el('input');
       inp.value = v;
       inp.readOnly = ro;
@@ -199,7 +220,7 @@
       inp.dataset.c = c;
       inp.enterKeyHint = 'next';
       var before = null;
-      inp.onfocus = function () { before = state(); };
+      inp.onfocus = function () { before = state(); if (r >= 0) last = [r, c]; };
       inp.oninput = function () {
         if (r < 0) t.head[c] = inp.value; else t.rows[r][c] = inp.value;
         td.classList.toggle('n', r >= 0 && !isNaN(num(inp.value)));
@@ -238,6 +259,16 @@
       if (inp) { inp.focus(); inp.select(); }
     }
     function focusCell(r, c) { focus = [r, c]; }
+
+    function putPicture(r, c) {
+      if (!opts.pickImage || !t.rows.length) return;
+      r = Math.max(0, Math.min(r, t.rows.length - 1));
+      opts.pickImage(function (files) {
+        var f = (files || []).filter(function (x2) { return /\.(jpe?g|png|gif|webp|bmp|heic|heif)$/i.test(x2.name); })[0];
+        if (!f) return;
+        change(function () { t.rows[r][c] = '![[Memo/_files/' + f.name + ']]'; });
+      });
+    }
 
     function insertCol(at) {
       change(function () {
