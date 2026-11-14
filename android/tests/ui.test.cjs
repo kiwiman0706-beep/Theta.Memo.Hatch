@@ -45,7 +45,7 @@ NOTES.push(
   { id: 'g2', title: '引っ越し', body: '新居へ', color: 'teal', pinned: false, archived: false, trashed: 0, labels: [], created: now - 200, updated: now - 200, gtd: 'project', important: true },
   { id: 'g3', title: '見積もり依頼', body: '', color: '', pinned: false, archived: false, trashed: 0, labels: [], created: now - 300, updated: now - 300, gtd: 'next', important: true, due: TOMORROW, parent: 'g2' },
   { id: 'g4', title: '家事', body: '- [ ] 洗濯 #重要\n- [ ] 掃除 📅 ' + PAST + '\n- [ ] 買い物', color: '', pinned: false, archived: false, trashed: 0, labels: [], created: now - 400, updated: now - 400 },
-  { id: 'g5', title: '企画', body: '## 目的\n\n- 売上\n- 認知\n\n## 手段\n\n- SNS', color: '', pinned: false, archived: false, trashed: 0, labels: [], created: now - 500, updated: now - 500, view: 'mindmap' }
+  { id: 'g5', title: '企画', body: '## 目的\n\n- 売上\n- 認知 ![[Memo/_files/a1.jpg]]\n\n## 手段\n\n- SNS', color: '', pinned: false, archived: false, trashed: 0, labels: [], created: now - 500, updated: now - 500, view: 'mindmap' }
 );
 for (let i = 0; i < 30; i++) NOTES.push({ id: 'm' + i, title: i % 3 ? '' : 'メモ ' + i, body: 'テキスト ' + i + '\n'.repeat(i % 4) + '続き', color: ['', 'red', 'teal', 'purple'][i % 4], pinned: false, archived: false, trashed: 0, labels: [], created: now - 1e7 - i, updated: now - 1e7 - i });
 
@@ -277,14 +277,58 @@ const MOCK = `
     await g.screenshot({ path: path.join(SHOTS, 'mindmap.png') });
     await g.locator('.mm-node text', { hasText: '売上' }).click();
     await g.click('.mm-tool[title="子を追加"]');
-    await g.fill('.sheet input', '数値目標');
-    await g.click('.sheet-buttons button:has-text("決定")');
+    // Typed right on the map: Enter makes the next branch beside it, Esc on an empty one stops
+    await g.fill('.mm-edit', '数値目標');
+    await g.press('.mm-edit', 'Enter');
+    await g.fill('.mm-edit', '期限');
+    await g.press('.mm-edit', 'Enter');
+    await g.press('.mm-edit', 'Escape');
     await g.waitForTimeout(900);
     sv = (await saves(g)).filter(n => n.id === 'g5').pop();
-    assert.ok(sv && sv.body.includes('- 売上\n  - 数値目標\n- 認知'), sv && sv.body);
-    assert.strictEqual(await g.locator('.mm-node').count(), 7);
+    assert.ok(sv && sv.body.includes('- 売上\n  - 数値目標\n  - 期限\n- 認知 ![[Memo/_files/a1.jpg]]'), sv && sv.body);
+    assert.strictEqual(await g.locator('.mm-node').count(), 8);
+    // Callout on a branch
+    await g.locator('.mm-node text', { hasText: '認知' }).click();
+    await g.click('.mm-tool[title="吹き出し"]');
+    await g.fill('.sheet textarea', 'SNS で広げる');
+    await g.click('.sheet-buttons button:has-text("決定")');
+    assert.strictEqual(await g.locator('.mm-bubble').count(), 1);
+    // Link two branches, then a brace over two branches with a comment
+    await g.locator('.mm-node text', { hasText: '数値目標' }).click();
+    await g.click('.mm-tool[title="ほかの枝とつなぐ"]');
+    await g.locator('.mm-node text', { hasText: 'SNS' }).first().click();
+    await g.fill('.sheet input', '効果を測る');
+    await g.click('.sheet-buttons button:has-text("決定")');
+    assert.strictEqual(await g.locator('.mm-link').count(), 1);
+    await g.locator('.mm-node text', { hasText: '数値目標' }).click();
+    await g.click('.mm-tool[title="枝をまとめてコメント"]');
+    await g.locator('.mm-node text', { hasText: '期限' }).click();
+    await g.fill('.sheet input', '測り方');
+    await g.click('.sheet-buttons button:has-text("決定")');
+    assert.strictEqual(await g.locator('.mm-group').count(), 1);
+    await g.waitForTimeout(900);
+    sv = (await saves(g)).filter(n => n.id === 'g5').pop();
+    assert.ok(/- 認知[^\n]*!\[\[Memo\/_files\/a1\.jpg\]\][^\n]*\n  > SNS で広げる/.test(sv.body), sv.body);
+    assert.strictEqual(await g.locator('.mm-img').count(), 1, 'the picture shows in its branch');
+    assert.ok(sv.extra && sv.extra.map_links.length === 1 && / -> m[a-z0-9]+ \| 効果を測る$/.test(sv.extra.map_links[0]), JSON.stringify(sv.extra));
+    assert.ok(sv.extra.map_groups.length === 1 && / \.\. m[a-z0-9]+ \| 測り方$/.test(sv.extra.map_groups[0]), JSON.stringify(sv.extra));
+    await g.screenshot({ path: path.join(SHOTS, 'mindmap-links.png') });
+    // Undo takes back the brace
+    await g.click('.mm-bar .icon[title="元に戻す"]');
+    assert.strictEqual(await g.locator('.mm-group').count(), 0);
+    // Long press and drag 期限 onto 認知 (as its child)
+    const from = await g.locator('.mm-node:has(text:text-is("期限")) rect').boundingBox();
+    const to = await g.locator('.mm-node:has(text:text-is("認知")) rect').boundingBox();
+    await g.mouse.move(from.x + from.width / 2, from.y + from.height / 2);
+    await g.mouse.down();
+    await g.waitForTimeout(600);
+    await g.mouse.move(to.x + to.width / 2, to.y + to.height / 2, { steps: 8 });
+    await g.mouse.up();
+    await g.waitForTimeout(900);
+    sv = (await saves(g)).filter(n => n.id === 'g5').pop();
+    assert.ok(/- 認知[^\n]*\n  > SNS で広げる\n  - 期限/.test(sv.body), sv.body);
     await g.click('.mm-bar .icon >> nth=0');
-    assert.ok(await g.locator('.editor .rt', { hasText: '数値目標' }).count(), 'editor shows the new branch');
+    assert.ok(await g.locator('.editor', { hasText: '数値目標' }).count(), 'editor shows the new branch');
     await g.context().close();
     passed++;
   }

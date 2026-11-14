@@ -366,3 +366,25 @@ body.drawer-open #drawer-back { display: block; }
 /* The editor's footer has many one-tap buttons: they narrow on small phones instead of overflowing. */
 .ed-foot .icon { flex: 0 1 40px; min-width: 30px; }
 .ed-foot .ed-stamp { min-width: 0; }
+
+/* mind map: editing in place, callouts, pictures, links, braces (0.4.0) */
+.mm-edit { position: absolute; z-index: 3; height: 36px; padding: 0 10px; font-size: 15px; border: 2px solid var(--accent); border-radius: 9px; background: var(--surface); color: var(--text); box-shadow: 0 2px 8px rgba(0,0,0,.25); }
+.mm-hint { position: absolute; left: 50%; top: 8px; transform: translateX(-50%); z-index: 2; background: var(--accent); color: var(--bg); padding: 6px 14px; border-radius: 16px; font-size: 13px; max-width: calc(100% - 24px); text-align: center; }
+.mm-bubble path { fill: #fff6c2; stroke: #d9b430; stroke-width: 1.2; }
+.mm-bubble text { font: 12px system-ui, sans-serif; fill: #4a3b00 !important; }
+.mm-img { clip-path: inset(0 round 6px); }
+.mm-more { font: 600 12px system-ui, sans-serif; fill: var(--muted) !important; }
+.mm-link .line, .mm-group .line { fill: none; stroke: var(--muted); stroke-width: 1.6; }
+.mm-link .line { stroke-dasharray: 6 4; }
+.mm-link .hit, .mm-group .hit { fill: none; stroke: transparent; stroke-width: 18; }
+.mm-link .tag, .mm-group .tag { fill: var(--surface); stroke: var(--muted); stroke-width: 1; }
+.mm-link text, .mm-group text { font: 12px system-ui, sans-serif; fill: var(--text); }
+.mm-group text { font-size: 13px; }
+.mm-link.sel .line, .mm-group.sel .line, .mm-link.sel .tag, .mm-group.sel .tag { stroke: var(--accent); stroke-width: 2.6; }
+.mm-arrow { fill: var(--muted); }
+.mm-node.ghost { opacity: .55; pointer-events: none; }
+.mm-node.drop.z-child rect { stroke: var(--accent) !important; stroke-width: 4; }
+.mm-node.drop.z-before rect { stroke-dasharray: 2 0; filter: drop-shadow(0 -4px 0 var(--accent)); }
+.mm-node.drop.z-after rect { filter: drop-shadow(0 4px 0 var(--accent)); }
+.mm-node.from rect { stroke: var(--accent) !important; stroke-width: 3.5; stroke-dasharray: 4 3; }
+.mm-bar .icon:disabled { opacity: .35; }

@@ -1127,6 +1127,7 @@
     $('#new-audio').onclick = function () { App.newNote('audio'); };
     // One tap each: the camera (Camera Hatch: photo / video / scan) and picking photos or files.
     $('#new-camera').onclick = function () { App.newNote('photo'); };
+    $('#new-map').onclick = function () { App.newNote('mindmap'); };
     $('#new-image').onclick = function () { App.newNote('file'); };
     $('#sel-cancel').onclick = function () { App.selected = {}; render(); };
     $('#sel-pin').onclick = function () {

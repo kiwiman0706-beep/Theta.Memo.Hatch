@@ -1006,18 +1006,33 @@
       if (opts.back && App.byId[opts.back]) App.openNote(App.byId[opts.back], {});
     }
 
-    function openMap() {
+    var mapPicks = {};
+    function openMap(startEditing) {
       flush();
+      var ex = n.extra || {};
       Mindmap.open({
         title: title.textContent || '',
         body: body(),
+        links: ex.map_links,
+        groups: ex.map_groups,
         readOnly: readOnly,
+        startEditing: startEditing === true,
         children: App.children(n.id),
-        onChange: function (newTitle, newBody) {
+        onChange: function (newTitle, newBody, meta) {
           if (newTitle !== title.textContent) title.textContent = newTitle;
           blocks = MD.parse(newBody);
+          if (meta) {
+            n.extra = n.extra || {};
+            if (meta.links.length) n.extra.map_links = meta.links; else delete n.extra.map_links;
+            if (meta.groups.length) n.extra.map_groups = meta.groups; else delete n.extra.map_groups;
+          }
           changed();
           draw();
+        },
+        pickImage: function (done) {
+          var req = 'mm' + Date.now();
+          mapPicks[req] = done;
+          App.native('attach', { note: n.id, req: req, accept: 'image/*' });
         },
         openNote: function (c) { Mindmap.current && Mindmap.current.close(); openOther(c, {}); },
         onClose: function () { flush(); }
@@ -1051,6 +1066,7 @@
         paintKids();
       },
       attached: function (d) {
+        if (d.req && mapPicks[d.req]) { var done = mapPicks[d.req]; delete mapPicks[d.req]; done(d.files || []); return; }
         (d.files || []).forEach(function (f) {
           insert({ t: 'file', name: f.name, label: /^image\//.test(f.mime) ? '' : f.label, kind: MD.kindOf(f.name) });
         });
@@ -1128,7 +1144,8 @@
     paintGtd();
     paintCrumbs();
     paintKids();
-    if (n.view === 'mindmap' && !opts.isNew) setTimeout(openMap, 0);
+    if (opts.kind === 'mindmap') { n.view = 'mindmap'; setTimeout(function () { openMap(true); }, 0); }
+    else if (n.view === 'mindmap' && !opts.isNew) setTimeout(openMap, 0);
     if (App.state.recording === n.id) api.recording({ note: n.id, start: App.state.recordingStart });
 
     var kind = opts.kind;

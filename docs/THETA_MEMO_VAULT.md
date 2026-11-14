@@ -44,6 +44,10 @@ done: 2026-10-30T…         ← 完了した日時
 parent: 5a1c…              ← 親メモのid（入れ子）
 up: "[[親のファイル名]]"     ← Obsidian用の親へのリンク（同期が書く。Obsidianでこれだけ書いても親子になる）
 view: mindmap              ← いつもマインドマップで開く
+map_links:                 ← マインドマップの枝同士の線（枝のブロックid -> 枝 | 説明）
+- m1k2 -> m9x0 | 理由
+map_groups:                ← 枝をまとめる ｝ とコメント（最初の枝 .. 最後の枝 | コメント）
+- m1k2 .. m3a4 | まとめ
 tags:                      ← Keepのラベル（Obsidianのタグとしても使える。空白は _ に）
 - 家
 source: https://…          ← 切り抜いたページ（Obsidian Web Clipper と同じ項目名）

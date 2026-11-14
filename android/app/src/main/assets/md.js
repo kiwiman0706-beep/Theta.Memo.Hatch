@@ -149,10 +149,14 @@
   // Headings, list items (nested by indent), paragraphs and other blocks as one tree, and back.
   // A body written as headings and lists comes back unchanged; everything else is kept verbatim.
   var LI = /^(\s*)([-*+]|\d+[.)])\s+(\[([ xX])\]\s+)?(.*)$/, H = /^(#{1,6})\s+(.*?)\s*#*\s*$/;
+  // A branch's Obsidian block id (" ^m1k2", used by the map's links and braces), and its callout:
+  // quote lines right under the item ("  > …").
+  var BID = /\s+\^([A-Za-z0-9-]+)$/;
+  function takeBid(node) { var m = BID.exec(node.text); if (m) { node.bid = m[1]; node.text = node.text.slice(0, m.index); } return node; }
   function outline(body, title) {
     var root = { kind: 'root', text: title || '', children: [] };
     var lines = String(body || '').replace(/\r\n/g, '\n').split('\n');
-    var hs = [{ node: root, level: 0 }], ls = [], para = null, raw = null, fence = null;
+    var hs = [{ node: root, level: 0 }], ls = [], para = null, raw = null, fence = null, last = null;
     function top() { return hs[hs.length - 1].node; }
     function end() { para = null; raw = null; }
     for (var i = 0; i < lines.length; i++) {
@@ -160,14 +164,23 @@
       if (fence) { raw.lines.push(l); if (l.trim().indexOf(fence) === 0) { fence = null; end(); } continue; }
       var f = /^\s*(```|~~~)/.exec(l);
       if (f) { fence = f[1]; raw = { kind: 'raw', lines: [l], children: [] }; top().children.push(raw); ls = []; para = null; continue; }
-      if (!l.trim()) { end(); continue; }
+      if (!l.trim()) { end(); last = null; continue; }
+      var q = /^(\s*)>\s?(.*)$/.exec(l);
+      if (q && last && !(raw && raw.lines.length)) { (last.note = last.note || []).push(q[2]); continue; }
+      // An indented quote inside a list (also after a blank line, as the rich editor writes it).
+      if (q && ls.length && q[1].replace(/\t/g, '    ').length > ls[0].indent) {
+        var qi = q[1].replace(/\t/g, '    ').length, own = null;
+        ls.forEach(function (x) { if (x.indent < qi) own = x.node; });
+        if (own) { (own.note = own.note || []).push(q[2]); continue; }
+      }
       var m = H.exec(l);
       if (m) {
         end(); ls = [];
         var level = m[1].length;
         while (hs.length > 1 && hs[hs.length - 1].level >= level) hs.pop();
-        var h = { kind: 'h', level: level, text: m[2], children: [] };
+        var h = takeBid({ kind: 'h', level: level, text: m[2], children: [] });
         top().children.push(h);
+        last = h;
         hs.push({ node: h, level: level });
         continue;
       }
@@ -176,11 +189,13 @@
         end();
         var ind = m[1].replace(/\t/g, '    ').length;
         while (ls.length && ls[ls.length - 1].indent >= ind) ls.pop();
-        var li = { kind: 'li', marker: /^\d/.test(m[2]) ? m[2] : '-', task: !!m[3], checked: !!m[4] && m[4] !== ' ', text: m[5], children: [] };
+        var li = takeBid({ kind: 'li', marker: /^\d/.test(m[2]) ? m[2] : '-', task: !!m[3], checked: !!m[4] && m[4] !== ' ', text: m[5], children: [] });
         (ls.length ? ls[ls.length - 1].node : top()).children.push(li);
+        last = li;
         ls.push({ node: li, indent: ind });
         continue;
       }
+      last = null;
       if (fileLine(l) || TABLE_ROW.test(l)) {
         para = null;
         if (!raw || fileLine(l)) { raw = { kind: 'raw', lines: [], children: [] }; top().children.push(raw); }
@@ -202,16 +217,21 @@
   function outlineBody(root) {
     var out = [];
     function blank() { if (out.length && out[out.length - 1] !== '') out.push(''); }
+    function one(t) { return String(t || '').replace(/\n/g, ' '); }
+    function tail(c) { return c.bid ? ' ^' + c.bid : ''; }
+    function note(c, pad) { (c.note || []).forEach(function (x) { out.push(pad + '> ' + one(x)); }); }
     function emit(node, depth) {
       node.children.forEach(function (c) {
         if (c.kind === 'h') {
           blank();
-          out.push(new Array(Math.min(6, c.level || 2) + 1).join('#') + ' ' + String(c.text || '').replace(/\n/g, ' '));
+          out.push(new Array(Math.min(6, c.level || 2) + 1).join('#') + ' ' + one(c.text) + tail(c));
+          note(c, '');
           blank();
           emit(c, 0);
         } else if (c.kind === 'li') {
           if (depth === 0 && out.length && out[out.length - 1] !== '' && !/^\s*([-*+]|\d+[.)])\s/.test(out[out.length - 1])) blank();
-          out.push(new Array(depth + 1).join('  ') + (c.marker || '-') + ' ' + (c.task ? '[' + (c.checked ? 'x' : ' ') + '] ' : '') + String(c.text || '').replace(/\n/g, ' '));
+          out.push(new Array(depth + 1).join('  ') + (c.marker || '-') + ' ' + (c.task ? '[' + (c.checked ? 'x' : ' ') + '] ' : '') + one(c.text) + tail(c));
+          note(c, new Array(depth + 2).join('  '));
           emit(c, depth + 1);
         } else {
           blank();

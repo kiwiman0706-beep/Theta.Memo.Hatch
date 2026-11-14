@@ -44,4 +44,23 @@ t('outline tree round trip', () => {
   prep.children[1].children.push({ kind: 'li', marker: '-', text: 'ホテル', children: [] });
   assert.ok(MD.outlineBody(tree).includes('- 予約\n  - ホテル\n\n本文'));
 });
+t('map ids and callouts', () => {
+  const body = '## 目的 ^g1\n> 今期の話\n\n- 売上 ^m1\n  > 前年比\n  - 数値 ![[Memo/_files/a.jpg]]\n- 認知\n\n## 引用\n\n> ただの引用';
+  const tree = MD.outline(body, 'T');
+  const h = tree.children[0];
+  assert.strictEqual(h.bid, 'g1');
+  assert.deepStrictEqual(h.note, ['今期の話']);
+  assert.strictEqual(h.children[0].bid, 'm1');
+  assert.strictEqual(h.children[0].text, '売上');
+  assert.deepStrictEqual(h.children[0].note, ['前年比']);
+  assert.strictEqual(tree.children[1].children[0].kind, 'p', 'a quote after a blank line stays a paragraph');
+  assert.strictEqual(MD.outlineBody(tree), body);
+});
+t('callouts after the rich editor rewrote the list', () => {
+  const tree = MD.outline('-   売上 ^m1\n    \n    > 前年比\n    \n    -   数値\n-   認知 ^m2', 'T');
+  assert.strictEqual(tree.children.length, 2);
+  assert.deepStrictEqual(tree.children[0].note, ['前年比']);
+  assert.strictEqual(tree.children[0].children[0].text, '数値');
+  assert.strictEqual(MD.outlineBody(tree), '- 売上 ^m1\n  > 前年比\n  - 数値\n- 認知 ^m2');
+});
 console.log(n + ' md tests passed');
