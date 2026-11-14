@@ -388,3 +388,39 @@ body.drawer-open #drawer-back { display: block; }
 .mm-node.drop.z-after rect { filter: drop-shadow(0 4px 0 var(--accent)); }
 .mm-node.from rect { stroke: var(--accent) !important; stroke-width: 3.5; stroke-dasharray: 4 3; }
 .mm-bar .icon:disabled { opacity: .35; }
+
+/* card DB (0.5.0) */
+.cards-view { position: fixed; inset: 0; z-index: 50; background: var(--bg); display: flex; flex-direction: column; }
+.cv-bar { display: flex; align-items: center; gap: 4px; padding: 4px 6px; }
+.cv-title { font-family: var(--display); font-size: 18px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; cursor: pointer; }
+.cv-tools { display: flex; gap: 6px; padding: 0 10px 8px; }
+.cv-search { flex: 1; min-width: 0; height: 38px; padding: 0 12px; border: 1px solid var(--line); border-radius: 19px; background: var(--surface); color: var(--text); font-size: 15px; }
+.cv-sort { flex: none; max-width: 42%; height: 38px; border: 1px solid var(--line); border-radius: 19px; background: var(--surface); color: var(--text); padding: 0 8px; font-size: 14px; }
+.cv-list { flex: 1; overflow-y: auto; padding: 0 10px 24px; }
+.cv-pre { padding: 4px 4px 10px; color: var(--muted); font-size: 14px; }
+.cv-pre > :first-child { margin-top: 0; }
+.cv-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(156px, 1fr)); gap: 10px; align-items: start; }
+.cv-card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; cursor: pointer; box-shadow: 0 1px 2px rgba(0,0,0,.06); }
+.cv-cover { display: block; width: 100%; height: 110px; object-fit: cover; background: var(--line); }
+.cv-card h3 { margin: 10px 12px 6px; font-size: 16px; line-height: 1.3; overflow-wrap: anywhere; }
+.cv-card dl { margin: 0 12px 8px; display: grid; grid-template-columns: auto 1fr; gap: 2px 8px; font-size: 13px; }
+.cv-card dt { color: var(--muted); white-space: nowrap; }
+.cv-card dd { margin: 0; overflow-wrap: anywhere; }
+.cv-body { margin: 0 12px 10px; font-size: 13px; color: var(--muted); overflow-wrap: anywhere; }
+.cv-empty { text-align: center; padding: 40px 16px; }
+.cv-table-wrap { overflow-x: auto; }
+.cv-table { border-collapse: collapse; font-size: 14px; min-width: 100%; }
+.cv-table th, .cv-table td { border-bottom: 1px solid var(--line); padding: 8px 10px; text-align: left; white-space: nowrap; }
+.cv-table th { position: sticky; top: 0; background: var(--bg); color: var(--muted); font-weight: 600; cursor: pointer; }
+.cv-table td.name { font-weight: 600; }
+.cv-table tr:not(:first-child) { cursor: pointer; }
+.cv-edit .cv-name { font-size: 17px; font-weight: 600; margin-bottom: 8px; }
+.cv-fields { display: flex; flex-direction: column; gap: 6px; }
+.cv-field { display: flex; gap: 6px; align-items: center; }
+.cv-field input { min-width: 0; height: 38px; border: 1px solid var(--line); border-radius: 8px; padding: 0 8px; background: var(--surface); color: var(--text); font-size: 15px; }
+.cv-field .k { flex: 0 0 34%; color: var(--muted); }
+.cv-field .v { flex: 1; }
+.cv-addf { margin: 8px 6px 8px 0; }
+.cv-text { margin-top: 4px; }
+.cv-pics { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 6px; }
+.cv-pics img { width: 72px; height: 72px; object-fit: cover; border-radius: 8px; }

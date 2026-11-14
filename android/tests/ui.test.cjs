@@ -333,6 +333,48 @@ const MOCK = `
     passed++;
   }
 
+  // Card DB: one note, cards side by side; new cards start with the fields already in use
+  {
+    const d = await page(390, 844);
+    await d.click('#new-more');
+    await d.click('.menu button:has-text("カード DB")');
+    await d.fill('.sheet input', '取引先');
+    await d.click('.sheet-buttons button:has-text("決定")');
+    await d.fill('.cv-name', '山田さん');
+    await d.fill('.cv-field .k', '会社');
+    await d.fill('.cv-field .v', '○○商事');
+    await d.click('.cv-addf:has-text("項目")');
+    await d.locator('.cv-field .k').nth(1).fill('売上');
+    await d.locator('.cv-field .v').nth(1).fill('1200');
+    await d.fill('.cv-text', 'よく電話する');
+    await d.click('.sheet-buttons button:has-text("決定")');
+    await d.click('.cv-bar .icon[title="カードを足す"]');
+    assert.deepStrictEqual(await d.locator('.cv-field .k').evaluateAll(es => es.map(e => e.value)), ['会社', '売上'], 'a new card has the fields the others use');
+    await d.fill('.cv-name', '佐藤さん');
+    await d.locator('.cv-field .v').nth(0).fill('△△');
+    await d.locator('.cv-field .v').nth(1).fill('300');
+    await d.click('.sheet-buttons button:has-text("決定")');
+    assert.strictEqual(await d.locator('.cv-card').count(), 2);
+    await d.screenshot({ path: path.join(SHOTS, 'cards.png') });
+    await d.selectOption('.cv-sort', '<売上');
+    assert.strictEqual(await d.locator('.cv-card h3').first().textContent(), '佐藤さん', 'sorted by 売上 as numbers');
+    await d.fill('.cv-search', '電話');
+    assert.strictEqual(await d.locator('.cv-card').count(), 1);
+    await d.fill('.cv-search', '');
+    await d.click('.cv-bar .icon[title="表で見る"]');
+    assert.strictEqual(await d.locator('.cv-table tr').count(), 3);
+    await d.screenshot({ path: path.join(SHOTS, 'cards-table.png') });
+    await d.waitForTimeout(900);
+    const sv = (await saves(d)).pop();
+    assert.strictEqual(sv.title, '取引先');
+    assert.strictEqual(sv.view, 'cards');
+    assert.strictEqual(sv.body, '## 山田さん\n- 会社: ○○商事\n- 売上: 1200\n\nよく電話する\n\n## 佐藤さん\n- 会社: △△\n- 売上: 300');
+    const overflow = await d.evaluate(() => document.documentElement.scrollWidth > window.innerWidth);
+    assert.ok(!overflow, 'no sideways scroll');
+    await d.context().close();
+    passed++;
+  }
+
   // Scan mode and a note placed on the home screen
   {
     const c = await page(390, 844);

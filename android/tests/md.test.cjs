@@ -63,4 +63,19 @@ t('callouts after the rich editor rewrote the list', () => {
   assert.strictEqual(tree.children[0].children[0].text, '数値');
   assert.strictEqual(MD.outlineBody(tree), '- 売上 ^m1\n  > 前年比\n  - 数値\n- 認知 ^m2');
 });
+t('card DB round trip', () => {
+  const C = require('../app/src/main/assets/cards.js');
+  const body = '取引先の一覧\n\n## 山田さん ^c1\n- 会社: ○○商事\n- 売上: 1,200\n\nよく電話する\n![[Memo/_files/y.jpg]]\n\n## 佐藤さん\n- 会社: △△\n- 売上: 300\n\n### 経歴\n- 2020年: 入社';
+  const db = C.parse(body);
+  assert.deepStrictEqual(db.pre, ['取引先の一覧']);
+  assert.strictEqual(db.cards.length, 2);
+  assert.strictEqual(db.cards[0].bid, 'c1');
+  assert.deepStrictEqual(db.cards[0].fields, [{ k: '会社', v: '○○商事' }, { k: '売上', v: '1,200' }]);
+  assert.strictEqual(C.cover(db.cards[0]), 'y.jpg');
+  assert.ok(db.cards[1].body.join('\n').includes('### 経歴\n- 2020年: 入社'), 'deeper headings and later lists stay in the card');
+  assert.deepStrictEqual(C.keys(db), ['会社', '売上']);
+  assert.strictEqual(C.serialize(db), body);
+  assert.ok(C.compare('300', '1,200') < 0, 'numbers sort as numbers');
+  assert.strictEqual(C.serialize(C.parse('')), '');
+});
 console.log(n + ' md tests passed');

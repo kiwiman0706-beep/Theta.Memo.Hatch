@@ -673,8 +673,10 @@
       if (n.source) items.push(['🔗 元のページを開く', function () { App.native('openUrl', { url: n.source }); }]);
       items.push(null);
       items.push(['🧠 マインドマップで見る', function () { openMap(); }]);
+      items.push(['🗂 カードで見る（カード DB）', function () { openCards(); }]);
       if (!readOnly) {
         items.push([(n.view === 'mindmap' ? '☑' : '☐') + ' いつもマインドマップで開く', function () { n.view = n.view === 'mindmap' ? '' : 'mindmap'; changed(); }]);
+        items.push([(n.view === 'cards' ? '☑' : '☐') + ' いつもカードで開く', function () { n.view = n.view === 'cards' ? '' : 'cards'; changed(); }]);
         items.push(['↳ 親メモを選ぶ（入れ子にする）', pickParent]);
         if (n.parent) items.push(['↰ 最上位に戻す', function () { n.parent = ''; changed(); flush(); paintCrumbs(); }]);
         items.push(['＋ 子メモを作る', function () { var c = App.blank(); c.parent = n.id; if (n.gtd) c.gtd = 'next'; isNew = false; saved = false; flush(); openOther(c, { isNew: true, kind: 'text' }); }]);
@@ -999,6 +1001,7 @@
     function close() {
       if (window.Ink && Ink.current) Ink.current.close();
       if (window.Mindmap && Mindmap.current) Mindmap.current.close();
+      if (window.Cards && Cards.current) Cards.current.close();
       flush();
       if (isNew && empty()) App.toast('空のメモは保存しませんでした');
       destroy();
@@ -1007,6 +1010,30 @@
     }
 
     var mapPicks = {};
+    function pickImage(done) {
+      var req = 'mm' + Date.now();
+      mapPicks[req] = done;
+      App.native('attach', { note: n.id, req: req, accept: 'image/*' });
+    }
+
+    function openCards(startNew) {
+      flush();
+      Cards.open({
+        title: title.textContent || '',
+        body: body(),
+        readOnly: readOnly,
+        startNew: startNew === true,
+        onChange: function (newTitle, newBody) {
+          if (newTitle !== title.textContent) title.textContent = newTitle;
+          blocks = MD.parse(newBody);
+          changed();
+          draw();
+          flush();
+        },
+        pickImage: pickImage,
+        onClose: function () { flush(); }
+      });
+    }
     function openMap(startEditing) {
       flush();
       var ex = n.extra || {};
@@ -1029,11 +1056,7 @@
           changed();
           draw();
         },
-        pickImage: function (done) {
-          var req = 'mm' + Date.now();
-          mapPicks[req] = done;
-          App.native('attach', { note: n.id, req: req, accept: 'image/*' });
-        },
+        pickImage: pickImage,
         openNote: function (c) { Mindmap.current && Mindmap.current.close(); openOther(c, {}); },
         onClose: function () { flush(); }
       });
@@ -1145,7 +1168,9 @@
     paintCrumbs();
     paintKids();
     if (opts.kind === 'mindmap') { n.view = 'mindmap'; setTimeout(function () { openMap(true); }, 0); }
+    else if (opts.kind === 'cards') { n.view = 'cards'; setTimeout(function () { openCards(true); }, 0); }
     else if (n.view === 'mindmap' && !opts.isNew) setTimeout(openMap, 0);
+    else if (n.view === 'cards' && !opts.isNew) setTimeout(openCards, 0);
     if (App.state.recording === n.id) api.recording({ note: n.id, start: App.state.recordingStart });
 
     var kind = opts.kind;
