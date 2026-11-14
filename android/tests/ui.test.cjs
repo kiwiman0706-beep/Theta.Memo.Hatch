@@ -375,6 +375,49 @@ const MOCK = `
     passed++;
   }
 
+  // Spreadsheet: a Markdown table edited as a grid, totals shown but not written
+  {
+    const q = await page(390, 844);
+    await q.click('#new-more');
+    await q.click('.menu button:has-text("表計算")');
+    await q.fill('.sheet input', '予算');
+    await q.click('.sheet-buttons button:has-text("決定")');
+    const cellIn = (r, c) => q.locator(`.sv-grid input[data-r="${r}"][data-c="${c}"]`);
+    await cellIn(-1, 0).fill('項目');
+    await cellIn(-1, 1).fill('金額');
+    await cellIn(0, 0).fill('機材');
+    await cellIn(0, 1).fill('3,000');
+    await cellIn(0, 1).press('Enter');
+    assert.strictEqual(await q.evaluate(() => document.activeElement.dataset.r + ',' + document.activeElement.dataset.c), '1,1', 'Enter goes down');
+    await cellIn(1, 0).fill('交通');
+    await cellIn(1, 1).fill('1200');
+    await cellIn(2, 0).fill('宿');
+    await cellIn(2, 1).fill('500');
+    await cellIn(2, 1).press('Enter');
+    assert.strictEqual(await q.locator('.sv-grid tr').count(), 2 + 4 + 1, 'Enter on the last row adds a row');
+    assert.strictEqual(await q.locator('.sv-agg[data-c="1"]').textContent(), '合計 4,700');
+    await q.click('.sv-agg[data-c="1"]');
+    assert.ok((await q.locator('.sv-agg[data-c="1"]').textContent()).startsWith('平均'));
+    await q.click('.sv-col[data-c="1"]');
+    await q.click('.menu button:has-text("小さい順")');
+    assert.strictEqual(await cellIn(0, 0).inputValue(), '宿', 'sorted by 金額 as numbers');
+    await q.click('.sv-num[data-r="3"]');
+    await q.click('.menu button:has-text("行を消す")');
+    await q.click('.sv-col[data-c="2"]');
+    await q.click('.menu button:has-text("列を消す")');
+    await q.screenshot({ path: path.join(SHOTS, 'sheet.png') });
+    await q.click('.sv-bar .icon[title="元に戻す"]');
+    assert.strictEqual(await q.locator('.sv-col').count(), 3, 'undo brings the column back');
+    await q.click('.sv-bar .icon[title="閉じる"]');
+    await q.waitForTimeout(900);
+    const sv = (await saves(q)).pop();
+    assert.strictEqual(sv.title, '予算');
+    assert.strictEqual(sv.view, 'sheet');
+    assert.strictEqual(sv.body, '| 項目 | 金額 | 列3 |\n| --- | --- | --- |\n| 宿 | 500 |  |\n| 交通 | 1200 |  |\n| 機材 | 3,000 |  |');
+    await q.context().close();
+    passed++;
+  }
+
   // Scan mode and a note placed on the home screen
   {
     const c = await page(390, 844);

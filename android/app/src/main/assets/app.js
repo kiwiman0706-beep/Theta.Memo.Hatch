@@ -421,6 +421,7 @@
     if (kids) chips.appendChild(el('span', 'chip kids', '▸ 子メモ ' + kids));
     if (n.view === 'mindmap') chips.appendChild(el('span', 'chip', '🧠 マインドマップ'));
     if (n.view === 'cards') chips.appendChild(el('span', 'chip', '🗂 カード DB'));
+    if (n.view === 'sheet') chips.appendChild(el('span', 'chip', '▦ 表計算'));
     if (n.source && domain(n.source)) chips.appendChild(el('span', 'chip link', domain(n.source)));
     (n.labels || []).slice(0, 4).forEach(function (l) { chips.appendChild(el('span', 'chip', l)); });
     if ((n.labels || []).length > 4) chips.appendChild(el('span', 'chip', '+' + (n.labels.length - 4)));
@@ -1080,6 +1081,7 @@
     if (document.body.classList.contains('drawer-open')) { closeDrawer(); return true; }
     if (window.Mindmap && Mindmap.current) { Mindmap.current.close(); return true; }
     if (window.Cards && Cards.current && !document.querySelector('.sheet-back')) { Cards.current.close(); return true; }
+    if (window.Sheet && Sheet.current && !document.querySelector('.sheet-back, .menu-back')) { Sheet.current.close(); return true; }
     if (window.Editor && Editor.current) { Editor.current.close(); return true; }
     if (Object.keys(App.selected).length) { App.selected = {}; render(); return true; }
     if (App.view.query || App.view.types.length || App.searchOpen) { closeSearch(); return true; }
@@ -1132,7 +1134,8 @@
     $('#new-more').onclick = function () {
       App.menu($('#new-more'), [
         ['🧠 マインドマップ', function () { App.newNote('mindmap'); }],
-        ['🗂 カード DB', function () { App.newNote('cards'); }]
+        ['🗂 カード DB', function () { App.newNote('cards'); }],
+        ['▦ 表計算（スプレッドシート）', function () { App.newNote('sheet'); }]
       ]);
     };
     $('#new-image').onclick = function () { App.newNote('file'); };

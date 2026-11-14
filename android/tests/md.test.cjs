@@ -78,4 +78,21 @@ t('card DB round trip', () => {
   assert.ok(C.compare('300', '1,200') < 0, 'numbers sort as numbers');
   assert.strictEqual(C.serialize(C.parse('')), '');
 });
+t('spreadsheet round trip', () => {
+  const S = require('../app/src/main/assets/sheet.js');
+  const body = '予算の表\n\n| 項目 | 金額 | メモ |\n| --- | ---: | --- |\n| 機材 | 3,000 | a\\|b |\n| 交通 | 1200 |  |\n\n後ろの文';
+  const t = S.parse(body);
+  assert.deepStrictEqual(t.head, ['項目', '金額', 'メモ']);
+  assert.deepStrictEqual(t.align, ['', 'r', '']);
+  assert.strictEqual(t.rows[0][2], 'a|b');
+  assert.strictEqual(S.aggregate(t.rows, 1, 'sum'), 4200);
+  assert.strictEqual(S.aggregate(t.rows, 2, 'count'), 1);
+  assert.strictEqual(S.num('¥1,500'), 1500);
+  assert.strictEqual(S.num('45%'), 0.45);
+  assert.ok(isNaN(S.num('3個')));
+  assert.strictEqual(S.serialize(t), body);
+  const e = S.parse('');
+  assert.ok(e.fresh);
+  assert.strictEqual(S.serialize(e), '| 列1 | 列2 | 列3 |\n| --- | --- | --- |\n|  |  |  |\n|  |  |  |\n|  |  |  |');
+});
 console.log(n + ' md tests passed');

@@ -424,3 +424,25 @@ body.drawer-open #drawer-back { display: block; }
 .cv-text { margin-top: 4px; }
 .cv-pics { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 6px; }
 .cv-pics img { width: 72px; height: 72px; object-fit: cover; border-radius: 8px; }
+
+/* spreadsheet (0.6.0) */
+.sheet-view { position: fixed; inset: 0; z-index: 50; background: var(--bg); display: flex; flex-direction: column; }
+.sv-bar { display: flex; align-items: center; gap: 4px; padding: 4px 6px; }
+.sv-title { font-family: var(--display); font-size: 18px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; cursor: pointer; }
+.sv-add { flex: none; height: 36px; padding: 0 10px; border: 1px solid var(--line); border-radius: 18px; background: var(--surface); color: var(--text); font-size: 14px; }
+.sv-bar .icon:disabled { opacity: .35; }
+.sv-scroll { flex: 1; overflow: auto; -webkit-overflow-scrolling: touch; }
+.sv-grid { border-collapse: separate; border-spacing: 0; font-size: 15px; }
+.sv-grid th, .sv-grid td { border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); padding: 0; background: var(--surface); }
+.sv-grid input { display: block; width: 7.5em; min-width: 0; height: 38px; padding: 0 8px; border: 0; background: transparent; color: var(--text); font: inherit; outline: none; }
+.sv-grid input:focus { box-shadow: inset 0 0 0 2px var(--accent); }
+.sv-grid td.n input, .sv-grid td.r input { text-align: right; font-variant-numeric: tabular-nums; }
+.sv-grid td.c input { text-align: center; }
+.sv-grid td.h input { font-weight: 700; }
+.sv-letters th { position: sticky; top: 0; z-index: 2; height: 26px; background: var(--bg); color: var(--muted); font: 600 12px system-ui, sans-serif; cursor: pointer; }
+.sv-head td { position: sticky; top: 26px; z-index: 1; background: var(--bg); }
+.sv-num { position: sticky; left: 0; z-index: 1; min-width: 34px; background: var(--bg) !important; color: var(--muted); font: 12px system-ui, sans-serif; text-align: center; cursor: pointer; }
+.sv-letters .sv-corner { left: 0; z-index: 3; }
+.sv-foot td { height: 32px; padding: 0 8px; background: var(--bg); color: var(--muted); font-size: 13px; white-space: nowrap; cursor: pointer; font-variant-numeric: tabular-nums; }
+.sv-foot td.r { text-align: right; }
+.sv-hint { margin: 0; padding: 6px 12px 10px; font-size: 12px; }
